@@ -7,3 +7,4 @@ xml
 .vscode
 db/
 db_granular/
+*.ttf

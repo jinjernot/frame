@@ -42,7 +42,7 @@ def set_default_font(doc):
     styles = doc.styles
     default_style = styles['Normal']
     font = default_style.font
-    font.name = 'HP Simplified'
+    font.name = 'HPFormaDJROffice-Regular'
     font.size = Pt(10)
 
 def apply_bold_font(doc, bold_words):
@@ -73,7 +73,7 @@ def format_document(doc, file, imgs_path):
         imgs_path (str): The path to the images directory.
     """
     bold_words = read_bold_words_from_json('/home/garciagi/qs/app/core/format/bold_words.json')
-
+    #bold_words = read_bold_words_from_json('app/core/format/bold_words.json')
     header(doc, file)
     footer(doc, imgs_path)
     set_margins(doc)
