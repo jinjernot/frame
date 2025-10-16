@@ -31,18 +31,13 @@ def callout_section(doc, file, prod_name, df):
     run.bold = True
     prodname_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-    # Read text from the external file
-    with open("/home/garciagi/qs/app/core/format/styles.txt", 'r', encoding='utf-8') as external_txt:
-    #with open("app/core/format/styles.txt", 'r', encoding='utf-8') as external_txt:
-        external_text = external_txt.read()
-
     # Read the doc
-    #df = pd.read_excel(file, sheet_name='Callouts')
-    df = pd.read_excel(file.stream, sheet_name='Callouts', engine='openpyxl')
+    df = pd.read_excel(file, sheet_name='Callouts')
+    #df = pd.read_excel(file.stream, sheet_name='Callouts', engine='openpyxl')
 
     # Set the target directory
-    target_directory = '/home/garciagi/qs'
-    #target_directory = '.'
+    #target_directory = '/home/garciagi/qs'
+    target_directory = '.'
 
     # Get image URLs from the DataFrame
     img_url1 = df.iloc[4, 0]  # Assuming column 0, row 5
