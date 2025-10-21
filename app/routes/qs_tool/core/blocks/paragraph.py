@@ -96,11 +96,30 @@ def insert_list(doc, df, start_value):
     
     paragraph = doc.add_paragraph()
 
+    # --- START: Superscript logic from old code ---
     for index, data in enumerate(non_footnotes[1:], start=1):
-        run = paragraph.add_run(data)
+        # This pattern finds numbers inside square brackets, e.g., [1]
+        pattern = re.compile(r"\[(\d+)\]")
         
+        # Split the string by the pattern
+        # e.g., "Text [1]" becomes ["Text ", "1", ""]
+        split_data = pattern.split(data)
+
+        # Iterate over the split parts
+        for i, text_part in enumerate(split_data):
+            if i % 2 == 0:
+                # Even parts are regular text
+                run = paragraph.add_run(text_part)
+            else:
+                # Odd parts are the numbers to be superscripted
+                sup_run = paragraph.add_run(text_part)
+                sup_run.font.superscript = True
+                sup_run.font.size = Pt(9) # Optional: keep smaller font size
+        
+        # Add a line break if it's not the last item
         if index < len(non_footnotes) - 1:
             run.add_break(WD_BREAK.LINE)
+    # --- END: Superscript logic from old code ---
     
     run.add_break(WD_BREAK.LINE)
     process_footnotes(doc, footnotes)

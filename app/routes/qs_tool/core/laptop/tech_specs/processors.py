@@ -11,13 +11,19 @@ def processors_section(doc, file):
     """Processors techspecs section"""
 
     try:
-        # Load Excel file and check if the "Processors" sheet exists
+        # Load Excel file and check if "Processors" or "Processor" sheet exists
         xls = pd.ExcelFile(file.stream, engine='openpyxl')
-        if "Processors" not in xls.sheet_names:
-            raise ValueError("Sheet 'Processors' not found in the Excel file.")
+        sheet_name_to_use = None
+        
+        if "Processors" in xls.sheet_names:
+            sheet_name_to_use = "Processors"
+        elif "Processor" in xls.sheet_names:
+            sheet_name_to_use = "Processor"
+        else:
+            raise ValueError("Sheet 'Processors' or 'Processor' not found in the Excel file.")
 
         # Read the sheet
-        df = pd.read_excel(file.stream, sheet_name='Processors', engine='openpyxl')
+        df = pd.read_excel(file.stream, sheet_name=sheet_name_to_use, engine='openpyxl')
 
         # Add title
         insert_title(doc, "Processors")
