@@ -51,6 +51,8 @@
       "UEFI version:",
       "Class:",
       "Does the BIOS implement the ISO/IEC 19678:2015 (formerly NIST 800-147) guidelines?:",
-      "Class:"
+      "Class:",
+      "Warranty",
+      "Integrated Bluetooth® specifications"
     ]
   }

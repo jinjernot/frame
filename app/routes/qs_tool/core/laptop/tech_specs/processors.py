@@ -71,9 +71,10 @@ def processors_section(doc, file):
             for paragraph in cell.paragraphs:
                 for run in paragraph.runs:
                     run.font.bold = True
-                    
+                        
         doc.add_paragraph()
 
+        # --- UPDATED FOOTNOTE LOGIC ---
         # Process Footnotes if available
         footnotes_index = df[df.eq('Footnotes').any(axis=1)].index.tolist()
         if footnotes_index:
@@ -81,14 +82,50 @@ def processors_section(doc, file):
             footnotes_data = df.iloc[footnotes_index + 1:]  
             footnotes_data = footnotes_data.dropna(how='all')  
             
+            # Create a single paragraph for all footnotes
+            footnote_paragraph = doc.add_paragraph()
+            first_footnote = True
+
             # Iterate over rows of footnotes_data and add them to the document
             for _, row in footnotes_data.iterrows():
                 row_values = row.dropna().tolist()
-                if row_values:
-                    # Add row values as a paragraph with specified font color
-                    paragraph = doc.add_paragraph(" - ".join(map(str, row_values)))
-                    for run in paragraph.runs:
-                        run.font.color.rgb = RGBColor(0, 0, 153)  # Set font color to blue    
+                
+                if not row_values:
+                    continue # Skip empty rows
+
+                if not first_footnote:
+                    # Add a line break before this new footnote
+                    footnote_paragraph.add_run().add_break(WD_BREAK.LINE)
+                
+                first_footnote = False
+
+                # Logic adapted from insert_list
+                first_cell = str(row_values[0])
+                
+                if 'footnote' in first_cell.lower() and len(row_values) > 1:
+                    # Case: "Footnote 02", "Text..."
+                    footnote_number_str = ''.join(filter(str.isdigit, first_cell))
+                    if footnote_number_str:
+                        footnote_number = int(footnote_number_str)
+                        footnote_text = str(row_values[1])
+                        
+                        run = footnote_paragraph.add_run(f"{footnote_number}. {footnote_text}")
+                        run.font.color.rgb = RGBColor(0, 0, 153)
+                    else:
+                        # Fallback: "Footnote", "Text..."
+                        run = footnote_paragraph.add_run(" - ".join(map(str, row_values)))
+                        run.font.color.rgb = RGBColor(0, 0, 153)
+
+                elif len(row_values) == 1:
+                    # Case: (empty), "Multicore text..."
+                    run = footnote_paragraph.add_run(str(row_values[0]))
+                    run.font.color.rgb = RGBColor(0, 0, 153)
+                
+                else:
+                    # Fallback for other formats
+                    run = footnote_paragraph.add_run(" - ".join(map(str, row_values)))
+                    run.font.color.rgb = RGBColor(0, 0, 153)
+        # --- END OF UPDATED LOGIC ---
 
         # Insert Horizontal Line
         insert_horizontal_line(doc.add_paragraph(), thickness=3)

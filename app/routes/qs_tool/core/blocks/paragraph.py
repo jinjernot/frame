@@ -96,7 +96,6 @@ def insert_list(doc, df, start_value):
     
     paragraph = doc.add_paragraph()
 
-    # --- START: Superscript logic from old code ---
     for index, data in enumerate(non_footnotes[1:], start=1):
         # This pattern finds numbers inside square brackets, e.g., [1]
         pattern = re.compile(r"\[(\d+)\]")
@@ -119,7 +118,6 @@ def insert_list(doc, df, start_value):
         # Add a line break if it's not the last item
         if index < len(non_footnotes) - 1:
             run.add_break(WD_BREAK.LINE)
-    # --- END: Superscript logic from old code ---
     
     run.add_break(WD_BREAK.LINE)
     process_footnotes(doc, footnotes)
