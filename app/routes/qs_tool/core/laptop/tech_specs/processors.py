@@ -3,9 +3,43 @@ from app.routes.qs_tool.core.blocks.title import *
 from app.routes.qs_tool.core.format.hr import *
 
 from docx.enum.text import WD_BREAK
-from docx.shared import RGBColor
+from docx.shared import RGBColor, Pt
 import pandas as pd
 import docx
+import re # <-- Import 're' for regular expressions
+
+# --- NEW HELPER FUNCTION ---
+# Define the pattern to find [n]
+superscript_pattern = re.compile(r"\[(\d+)\]")
+
+def add_formatted_run(paragraph, text, bold=False, color=None, size=None):
+    """
+    Adds text to a paragraph, processing [n] as superscript,
+    and applies optional formatting.
+    """
+    text = str(text)
+    parts = superscript_pattern.split(text)
+    
+    for i, part in enumerate(parts):
+        if not part: # Skip empty strings from split
+            continue
+            
+        run = paragraph.add_run(part)
+        
+        if i % 2 == 1: # This is the number inside [ ]
+            run.font.superscript = True
+            # Optional: Uncomment to set a specific size like in your example
+            # run.font.size = Pt(9) 
+        
+        # Apply styles to all parts (superscript or not)
+        if bold:
+            run.font.bold = True
+        if color:
+            run.font.color.rgb = color
+        if size:
+            run.font.size = size
+# --- END OF HELPER FUNCTION ---
+
 
 def processors_section(doc, file):
     """Processors techspecs section"""
@@ -54,27 +88,35 @@ def processors_section(doc, file):
                 break  # Exit the loop if footnote row is reached
             
             row_cells = table.add_row().cells
-            for i, cell in enumerate(row):
-                row_cells[i].text = str(cell)
+            for i, cell_data in enumerate(row):
                 
-                # Bold the text if the cell contains "Processor Family"
-                if str(cell) == "Processor Family":
-                    for paragraph in row_cells[i].paragraphs:
-                        for run in paragraph.runs:
-                            run.font.bold = True
+                cell = row_cells[i]
+                cell_text = str(cell_data)
+                
+                # Clear existing paragraph content
+                cell.text = "" 
+                paragraph = cell.paragraphs[0]
+                
+                # Check if this specific cell should be bold
+                is_bold = (cell_text == "Processor Family")
+                
+                # Use the new helper function to add text
+                add_formatted_run(paragraph, cell_text, bold=is_bold)
 
         # Remove the first row
         if len(table.rows) > 1:  # Ensure there are rows to delete
             table.rows[0]._element.getparent().remove(table.rows[0]._element)
 
+        # Bold the first row (headers) and apply superscript logic
         for cell in table.rows[0].cells:
-            for paragraph in cell.paragraphs:
-                for run in paragraph.runs:
-                    run.font.bold = True
-                        
-        doc.add_paragraph()
+            cell_text = cell.text # Get the text
+            cell.text = "" # Clear it
+            paragraph = cell.paragraphs[0]
+            # Add it back, formatted with bold and superscript
+            add_formatted_run(paragraph, cell_text, bold=True)
 
-        # --- UPDATED FOOTNOTE LOGIC ---
+                    
+        doc.add_paragraph()
         # Process Footnotes if available
         footnotes_index = df[df.eq('Footnotes').any(axis=1)].index.tolist()
         if footnotes_index:
@@ -85,6 +127,9 @@ def processors_section(doc, file):
             # Create a single paragraph for all footnotes
             footnote_paragraph = doc.add_paragraph()
             first_footnote = True
+            
+            # Define the blue color
+            footnote_color = RGBColor(0, 0, 153)
 
             # Iterate over rows of footnotes_data and add them to the document
             for _, row in footnotes_data.iterrows():
@@ -99,7 +144,6 @@ def processors_section(doc, file):
                 
                 first_footnote = False
 
-                # Logic adapted from insert_list
                 first_cell = str(row_values[0])
                 
                 if 'footnote' in first_cell.lower() and len(row_values) > 1:
@@ -109,23 +153,27 @@ def processors_section(doc, file):
                         footnote_number = int(footnote_number_str)
                         footnote_text = str(row_values[1])
                         
-                        run = footnote_paragraph.add_run(f"{footnote_number}. {footnote_text}")
-                        run.font.color.rgb = RGBColor(0, 0, 153)
+                        # Add the number part (e.g., "1. ")
+                        run_num = footnote_paragraph.add_run(f"{footnote_number}. ")
+                        run_num.font.color.rgb = footnote_color
+                        
+                        # Add the text part, processed for superscripts
+                        add_formatted_run(footnote_paragraph, footnote_text, color=footnote_color)
                     else:
                         # Fallback: "Footnote", "Text..."
-                        run = footnote_paragraph.add_run(" - ".join(map(str, row_values)))
-                        run.font.color.rgb = RGBColor(0, 0, 153)
+                        text_to_add = " - ".join(map(str, row_values))
+                        add_formatted_run(footnote_paragraph, text_to_add, color=footnote_color)
 
                 elif len(row_values) == 1:
                     # Case: (empty), "Multicore text..."
-                    run = footnote_paragraph.add_run(str(row_values[0]))
-                    run.font.color.rgb = RGBColor(0, 0, 153)
+                    text_to_add = str(row_values[0])
+                    add_formatted_run(footnote_paragraph, text_to_add, color=footnote_color)
                 
                 else:
                     # Fallback for other formats
-                    run = footnote_paragraph.add_run(" - ".join(map(str, row_values)))
-                    run.font.color.rgb = RGBColor(0, 0, 153)
-        # --- END OF UPDATED LOGIC ---
+                    text_to_add = " - ".join(map(str, row_values))
+                    add_formatted_run(footnote_paragraph, text_to_add, color=footnote_color)
+
 
         # Insert Horizontal Line
         insert_horizontal_line(doc.add_paragraph(), thickness=3)

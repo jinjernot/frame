@@ -46,7 +46,14 @@ def tech_specs_section(doc, file):
         # Remove extra spaces from the end of each value and convert all columns to strings
         df = df.applymap(lambda x: str(x).strip() if isinstance(x, str) else x)
 
-        # Filter out rows where the "Value" column is empty
+        values_to_drop = ["General content", "General content 01", "General content 02"]
+        
+        if not df.empty:
+            # Check if there are at least 2 columns before trying to access index 1
+            if len(df.columns) > 1:
+                df = df[~df[df.columns[1]].isin(values_to_drop)]
+
+        # Filter out rows where the "Value" column (assumed to be column 2, index 1) is empty
         df_filtered = df.dropna(subset=[df.columns[1]])
 
         # Save the filtered DataFrame to a new Excel file

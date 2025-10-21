@@ -51,9 +51,6 @@ def insert_table(doc, df):
             page_width = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
 
             table = doc.add_table(rows=1, cols=3)
-            column_widths = (Inches(2), Inches(2), Inches(4))
-            for column, width in zip(table.columns, column_widths):
-                column.width = width
 
             for i in range(index + 1, len(df)):
                 if df.iloc[i, 0] == "Table":
@@ -115,5 +112,4 @@ def insert_table(doc, df):
                 process_footnotes(doc, footnotes)
                 footnotes = []
             doc.add_paragraph()
-
-    table_column_widths(table, (Inches(2), Inches(4), Inches(2)))
+            table_column_widths(table, (Inches(2), Inches(2), Inches(4)))
