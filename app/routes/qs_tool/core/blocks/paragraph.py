@@ -49,7 +49,7 @@ def insert_error(doc, error_message):
     """
     paragraph = doc.add_paragraph()
     run = paragraph.add_run(f"Error: {error_message}")
-    run.font.color.rgb = RGBColor(255, 0, 0)  # Set font color to red
+    run.font.color.rgb = RGBColor(255, 0, 0)
     run.font.bold = True
     run.add_break(WD_BREAK.LINE)
 
@@ -68,7 +68,6 @@ def insert_list(doc, df, start_value):
     
     start_index = df.index[df.iloc[:, 1] == start_value].tolist()[0]
     
-    # Find the end of the list, which is marked by the next "Value" or end of the dataframe
     end_index = len(df)
     for i in range(start_index + 1, len(df)):
         if df.iloc[i, 1] == 'Value':
@@ -81,13 +80,19 @@ def insert_list(doc, df, start_value):
     footnotes = []
 
     for index, row in items_df.iterrows():
-        if 'footnote' in str(row[0]).lower():
-            footnote_number = int(''.join(filter(str.isdigit, row[0])))
-            footnotes.append(f"{footnote_number}. {row[1]}")
-        elif str(row[0]).lower().strip() == 'footnote' or str(row[1]).lower().strip() == 'footnote':
+        col_a_str = str(row[0]) if not pd.isna(row[0]) else ""
+        col_b_str = str(row[1]) if not pd.isna(row[1]) else ""
+
+        if 'footnote' in col_a_str.lower():
+            try:
+                footnote_number = int(''.join(filter(str.isdigit, col_a_str)))
+                footnotes.append(f"{footnote_number}. {col_b_str}")
+            except ValueError:
+                continue # 'footnote' was in text but no number
+        elif col_a_str.lower().strip() == 'footnote' or col_b_str.lower().strip() == 'footnote':
             continue
         else:
-            non_footnotes.append(row[1])
+            non_footnotes.append(col_b_str)
 
     paragraph = doc.add_paragraph()
     run = paragraph.add_run(start_value.upper()) 
@@ -97,29 +102,32 @@ def insert_list(doc, df, start_value):
     paragraph = doc.add_paragraph()
 
     for index, data in enumerate(non_footnotes[1:], start=1):
-        # This pattern finds numbers inside square brackets, e.g., [1]
-        pattern = re.compile(r"\[(\d+)\]")
-        
-        # Split the string by the pattern
-        # e.g., "Text [1]" becomes ["Text ", "1", ""]
-        split_data = pattern.split(data)
+        pattern = re.compile(r"\[([\d,]+)\]")
+        split_data = pattern.split(str(data))
 
         # Iterate over the split parts
         for i, text_part in enumerate(split_data):
             if i % 2 == 0:
-                # Even parts are regular text
                 run = paragraph.add_run(text_part)
             else:
-                # Odd parts are the numbers to be superscripted
+
                 sup_run = paragraph.add_run(text_part)
                 sup_run.font.superscript = True
-                sup_run.font.size = Pt(9) # Optional: keep smaller font size
+                sup_run.font.size = Pt(9) 
         
         # Add a line break if it's not the last item
         if index < len(non_footnotes) - 1:
-            run.add_break(WD_BREAK.LINE)
-    
-    run.add_break(WD_BREAK.LINE)
+            if 'run' in locals() and run:
+                 run.add_break(WD_BREAK.LINE)
+            elif 'sup_run' in locals() and sup_run:
+                 sup_run.add_break(WD_BREAK.LINE)
+
+    # Add a break after the last item
+    if 'run' in locals() and run:
+        run.add_break(WD_BREAK.LINE)
+    elif 'sup_run' in locals() and sup_run:
+        sup_run.add_break(WD_BREAK.LINE)
+
     process_footnotes(doc, footnotes)
 
     insert_horizontal_line(doc.add_paragraph(), thickness=3)
@@ -140,7 +148,7 @@ def insert_footnote(doc, df, iloc_range, iloc_column):
     paragraph = doc.add_paragraph()
 
     for index, note in enumerate(footnote):
-        run = paragraph.add_run(note)
+        run = paragraph.add_run(str(note))
         run.font.color.rgb = RGBColor(0, 0, 153)
         
         if index < len(footnote) - 1:
