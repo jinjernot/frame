@@ -18,14 +18,25 @@ def system_unit_section(doc, file):
         start_col_idx = 0
         end_col_idx = 1
         start_row_idx = 4
-        end_row_idx = 42
+        end_row_idx = 42  # Default end row if no marker is found
 
-        # Find the footnotes row index (if exists)
-        footnotes_index = df[df.eq('Footnotes').any(axis=1)].index.tolist()
-        if footnotes_index:
-            end_row_idx = footnotes_index[0] - 1  # Stop before the footnotes row
+        # --- UPDATED LOGIC TO FIND END OF TABLE ---
+        # Search for 'Footnotes' (plural) or 'Footnote' (singular) in the first column
+        col_a_search = df.iloc[:, 0].astype(str).str.strip()
+        footnotes_plural_idx = col_a_search[col_a_search == 'Footnotes'].index.tolist()
+        footnotes_singular_idx = col_a_search[col_a_search == 'Footnote'].index.tolist()
 
-        # Extract only the necessary rows
+        all_footnote_marker_indices = sorted(footnotes_plural_idx + footnotes_singular_idx)
+
+        first_footnote_marker_index = None
+        if all_footnote_marker_indices:
+            # Get the first marker found
+            first_footnote_marker_index = all_footnote_marker_indices[0]
+            # Stop the table data one row *before* the marker
+            end_row_idx = first_footnote_marker_index - 1
+        # --- END UPDATED LOGIC ---
+
+        # Extract only the necessary rows for the table
         data_range = df.iloc[start_row_idx:end_row_idx+1, start_col_idx:end_col_idx+1]
         data_range = data_range.dropna(how='all')
 
@@ -36,6 +47,7 @@ def system_unit_section(doc, file):
         column_widths = (Inches(3), Inches(5))
         table_column_widths(table, column_widths)
 
+        # This pattern handles the superscript [1] in the main table
         pattern = re.compile(r"\[(\d+)\]")  # Match [x] where x is a number
 
         for row_idx in range(num_rows):
@@ -63,29 +75,65 @@ def system_unit_section(doc, file):
             for paragraph in cell.paragraphs:
                 for run in paragraph.runs:
                     run.font.bold = True
-                               
+                                
         doc.add_paragraph()
 
-        # Process footnotes if they exist
-        if footnotes_index:
-            footnotes_index = footnotes_index[0]  # Assuming there's only one "Footnotes" row
-            footnotes_data = df.iloc[footnotes_index + 1:].dropna(how='all')  # Drop rows with all NaN values
+        # --- UPDATED FOOTNOTE PROCESSING LOGIC ---
+        # Process footnotes if a marker was found
+        if first_footnote_marker_index is not None:
+            # Start processing from the row *after* the marker
+            footnotes_data = df.iloc[first_footnote_marker_index + 1:].dropna(how='all')
             
-            footnotes = [" - ".join(map(str, row.dropna().tolist())) for _, row in footnotes_data.iterrows() if row.dropna().tolist()]
-            
-            paragraph = doc.add_paragraph()
+            formatted_footnotes = []
 
-            for index, data in enumerate(footnotes):
-                if "Container Name" in data or "Wireless WAN" in data:
+            for _, row in footnotes_data.iterrows():
+                # Ensure row has at least 2 columns and data is not NaN
+                if len(row) < 2 or pd.isna(row.iloc[0]) or pd.isna(row.iloc[1]):
+                    continue
+                    
+                col_a = str(row.iloc[0]).lower().strip()
+                col_b = str(row.iloc[1]).strip()
+
+                # Skip known irrelevant rows
+                if "container name" in col_a or "wireless wan" in col_a:
+                    continue
+
+                # Skip header row if it got included (e.g., 'Footnotes' or 'Footnote')
+                if col_a == 'footnotes' or col_a == 'footnote':
                     continue
                 
-                # Replace [x] with "x." for footnotes
-                formatted_text = pattern.sub(r"\1.", data)
-                run = paragraph.add_run(formatted_text)
-                run.font.color.rgb = RGBColor(0, 0, 153)  # Set font color to blue
+                # NEW LOGIC: Checks for "footnote1", "footnote2", etc.
+                if 'footnote' in col_a:
+                    try:
+                        # Extract number (e.g., from "footnote1")
+                        footnote_number = int(''.join(filter(str.isdigit, col_a)))
+                        # Format as "1. Text from Column B"
+                        formatted_text = f"{footnote_number}. {col_b}"
+                        formatted_footnotes.append(formatted_text)
+                    except ValueError:
+                        # 'footnote' was in the text but no number was found
+                        continue
+                
+                # Fallback for old format: [1] in Col A, Text in Col B
+                elif pattern.match(col_a):
+                    try:
+                        footnote_number = pattern.match(col_a).group(1)
+                        formatted_text = f"{footnote_number}. {col_b}"
+                        formatted_footnotes.append(formatted_text)
+                    except (ValueError, AttributeError):
+                        continue
 
-                if index < len(footnotes) - 1 and footnotes[index + 1].strip():
-                    paragraph.add_run().add_break(WD_BREAK.LINE)
+            # Add the processed footnotes to the document
+            if formatted_footnotes:
+                paragraph = doc.add_paragraph()
+                for index, data in enumerate(formatted_footnotes):
+                    run = paragraph.add_run(data)
+                    run.font.color.rgb = RGBColor(0, 0, 153)  # Set font color to blue
+                    
+                    # Add a line break if it's not the last item
+                    if index < len(formatted_footnotes) - 1:
+                        run.add_break(WD_BREAK.LINE)
+        # --- END FOOTNOTE PROCESSING ---
 
         # Insert HR
         insert_horizontal_line(doc.add_paragraph(), thickness=3)
