@@ -43,7 +43,7 @@ def set_default_font(doc):
     styles = doc.styles
     default_style = styles['Normal']
     font = default_style.font
-    font.name = 'HPFormdDJROffice-Regular'
+    font.name = 'HP Forma DJR Office'
     font.size = Pt(10)
 
 def apply_bold_font(doc, bold_words):
