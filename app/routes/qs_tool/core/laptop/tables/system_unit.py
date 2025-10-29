@@ -6,6 +6,25 @@ from docx.enum.text import WD_BREAK
 import pandas as pd
 import re
 
+# --- ADDED THIS FUNCTION (from your example) ---
+def process_footnotes(doc, footnotes):
+    """
+    Add footnotes to the Word document with blue font color.
+    (This is the function you provided)
+    """
+    if not footnotes:
+        return
+
+    paragraph = doc.add_paragraph()
+    for index, data in enumerate(footnotes):
+        run = paragraph.add_run(data)
+        run.font.color.rgb = RGBColor(0, 0, 153)
+        
+        if index < len(footnotes) - 1:
+            run.add_break(WD_BREAK.LINE)
+# --- END ADDED FUNCTION ---
+
+
 def system_unit_section(doc, file):
     """System Unit table"""
     try:
@@ -17,16 +36,20 @@ def system_unit_section(doc, file):
 
         start_col_idx = 0
         end_col_idx = 1
-        start_row_idx = 4
+        start_row_idx = 3
         end_row_idx = 42  # Default end row if no marker is found
 
         # --- UPDATED LOGIC TO FIND END OF TABLE ---
-        # Search for 'Footnotes' (plural) or 'Footnote' (singular) in the first column
-        col_a_search = df.iloc[:, 0].astype(str).str.strip()
-        footnotes_plural_idx = col_a_search[col_a_search == 'Footnotes'].index.tolist()
-        footnotes_singular_idx = col_a_search[col_a_search == 'Footnote'].index.tolist()
+        # Search for 'Footnotes' or 'Footnote' in the first TWO columns
+        col_a_search = df.iloc[:, 0].astype(str).str.strip().str.lower()
+        col_b_search = df.iloc[:, 1].astype(str).str.strip().str.lower()
 
-        all_footnote_marker_indices = sorted(footnotes_plural_idx + footnotes_singular_idx)
+        search_terms = ['footnote', 'footnotes']
+        col_a_marker_indices = col_a_search[col_a_search.isin(search_terms)].index.tolist()
+        col_b_marker_indices = col_b_search[col_b_search.isin(search_terms)].index.tolist()
+        
+        # Combine indices from both columns, remove duplicates, and sort
+        all_footnote_marker_indices = sorted(list(set(col_a_marker_indices + col_b_marker_indices)))
 
         first_footnote_marker_index = None
         if all_footnote_marker_indices:
@@ -67,9 +90,9 @@ def system_unit_section(doc, file):
                             run.font.size = Pt(9)  # Adjust font size
 
         # Bold the first column
-        for row in table.rows:
-            if row.cells[0].paragraphs and row.cells[0].paragraphs[0].runs:
-                row.cells[0].paragraphs[0].runs[0].font.bold = True
+        #for row in table.rows:
+        #    if row.cells[0].paragraphs and row.cells[0].paragraphs[0].runs:
+        #        row.cells[0].paragraphs[0].runs[0].font.bold = True
 
         for cell in table.rows[0].cells:
             for paragraph in cell.paragraphs:
@@ -123,17 +146,10 @@ def system_unit_section(doc, file):
                     except (ValueError, AttributeError):
                         continue
 
+            # --- CALLING YOUR DEDICATED FUNCTION ---
             # Add the processed footnotes to the document
-            if formatted_footnotes:
-                paragraph = doc.add_paragraph()
-                for index, data in enumerate(formatted_footnotes):
-                    run = paragraph.add_run(data)
-                    run.font.color.rgb = RGBColor(0, 0, 153)  # Set font color to blue
-                    
-                    # Add a line break if it's not the last item
-                    if index < len(formatted_footnotes) - 1:
-                        run.add_break(WD_BREAK.LINE)
-        # --- END FOOTNOTE PROCESSING ---
+            process_footnotes(doc, formatted_footnotes)
+            # --- END FOOTNOTE PROCESSING ---
 
         # Insert HR
         insert_horizontal_line(doc.add_paragraph(), thickness=3)

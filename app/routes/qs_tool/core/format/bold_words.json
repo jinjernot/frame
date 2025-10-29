@@ -1,7 +1,14 @@
 {
     "bold_words": [
       "Display Size (Diagonal)",
-      "Maximum Memory",
+      "Aspect Ratio",
+      "Screen to Body Ratio",
+      "Max Hinge Open Angle",
+      "Docking station model name",
+      "Total number of supported displays (incl. the notebook display)",
+      "Max. resolutions supported",
+      "Dock Connectors",
+      "Technical limitations",
       "Preinstalled",
       "Integrated",
       "Non-Touch",
@@ -25,6 +32,10 @@
       "Manageability Features",
       "Security Management",
       "Security- TPM",
+      "Model",
+      "Firmware Version",
+      "TCG",
+      "FIPS 140-2 Compliant",
       "Security Feature ",
       "1st Source",
       "BIOS",
@@ -54,6 +65,20 @@
       "Class:",
       "Warranty",
       "Integrated Bluetooth® specifications",
-      "Secondary Storage"
-    ]
-  }
+      "Secondary Storage",
+      "Packaging and Pallet Dimensions"
+    ],
+  
+  "blue_words": [
+    "Items below may be optional.",
+    "Availability may vary by country.",
+    "Actual brightness will be lower with touchscreen or HP Sure View.",
+    "Privacy panel is only available on select models.",
+    "Power supply availability may vary by country.",
+    "Battery is internal and not replaceable by customer. Serviceable by warranty.",
+    "Weight will vary by configuration. Does not include power adapter.",
+    "Front height measurement is near the front edge where the mechanical chassis taper begins. Back height measurement is near the rear edge where the mechanical chassis taper ends."
+
+  ]
+
+}

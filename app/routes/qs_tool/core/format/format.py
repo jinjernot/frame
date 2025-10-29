@@ -3,21 +3,25 @@ from app.routes.qs_tool.core.format.footer import footer
 import json
 
 from docx.shared import Pt
-from docx.enum.text import WD_BREAK  # Import WD_BREAK here
+from docx.shared import RGBColor  # <<< IMPORT ADDED
+from docx.enum.text import WD_BREAK
 
-def read_bold_words_from_json(json_file):
+# <<< FUNCTION MODIFIED
+def read_format_words_from_json(json_file):
     """
-    Read bold words from a JSON file.
+    Read bold and blue words from a JSON file.
 
     Parameters:
         json_file (str): The path to the JSON file.
 
     Returns:
-        list: A list of bold words.
+        tuple: A tuple containing (list_of_bold_words, list_of_blue_words)
     """
-    with open(json_file, 'r') as f:
+    with open(json_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
-        return data.get('bold_words', [])
+        bold_words = data.get('bold_words', [])
+        blue_words = data.get('blue_words', [])
+        return bold_words, blue_words
 
 def set_margins(doc):
     """
@@ -46,27 +50,34 @@ def set_default_font(doc):
     font.name = 'HP Forma DJR Office'
     font.size = Pt(10)
 
-def apply_bold_font(doc, bold_words):
+# <<< FUNCTION MODIFIED
+def apply_custom_formatting(doc, bold_words, blue_words):
     """
-    Apply bold font to specific words and add line breaks before and after.
+    Apply bold font and blue color to specific words.
 
     Parameters:
         doc (docx.Document): The Word document object.
         bold_words (list): A list of words to be bolded.
+        blue_words (list): A list of words to be colored blue.
     """
     for paragraph in doc.paragraphs:
         for run in paragraph.runs:
             # Get the stripped text from the run
             run_text_stripped = run.text.strip()
             
-            # Check if the stripped text exactly matches one of the bold words
+            # <<< LOGIC MODIFIED (if/elif)
+            # Check for bold words first
             if run_text_stripped in bold_words:
-                # --- New Approach ---
                 # Add a newline before AND after the word
                 run.text = "\n" + run_text_stripped + "\n"
                 
                 # Apply bolding after modifying the text
                 run.bold = True
+            
+            # Check for blue words
+            elif run_text_stripped in blue_words:
+                # Apply blue color
+                run.font.color.rgb = RGBColor(0, 0, 153)
 
 def format_document(doc, file, imgs_path):
     """
@@ -77,13 +88,19 @@ def format_document(doc, file, imgs_path):
         file (str): The path to the Word document.
         imgs_path (str): The path to the images directory.
     """
-    bold_words = read_bold_words_from_json('/home/garciagi/qs/app/core/format/bold_words.json')
-    #bold_words = read_bold_words_from_json('app/core/format/bold_words.json')
+    # <<< LOGIC MODIFIED
+    # Read both lists from the JSON file
+    bold_words, blue_words = read_format_words_from_json('/home/garciagi/frame/app/routes/qs_tool/core/format/bold_words.json')
+    #bold_words, blue_words = read_format_words_from_json('app/core/format/bold_words.json')
+    
     header(doc, file)
     footer(doc, imgs_path)
-    set_margins(doc)  # Corrected typo here (was set__margins)
+    set_margins(doc)
     set_default_font(doc)
-    apply_bold_font(doc, bold_words)
+    
+    # <<< LOGIC MODIFIED
+    # Pass both lists to the new formatting function
+    apply_custom_formatting(doc, bold_words, blue_words)
 
     # Apply cell spacing to all tables
     for table in doc.tables:
@@ -94,4 +111,3 @@ def format_document(doc, file, imgs_path):
                 for paragraph in cell.paragraphs:
                     paragraph.style.paragraph_format.space_before = Pt(0)
                     paragraph.style.paragraph_format.space_after = Pt(0)
-

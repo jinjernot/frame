@@ -5,11 +5,9 @@ from app.routes.qs_tool.core.format.hr import *
 from docx.enum.text import WD_BREAK
 from docx.shared import RGBColor, Pt
 import pandas as pd
-import docx
-import re # <-- Import 're' for regular expressions
+import re
 
-# --- NEW HELPER FUNCTION ---
-# Define the pattern to find [n]
+
 superscript_pattern = re.compile(r"\[(\d+)\]")
 
 def add_formatted_run(paragraph, text, bold=False, color=None, size=None):
@@ -21,24 +19,20 @@ def add_formatted_run(paragraph, text, bold=False, color=None, size=None):
     parts = superscript_pattern.split(text)
     
     for i, part in enumerate(parts):
-        if not part: # Skip empty strings from split
+        if not part: 
             continue
             
         run = paragraph.add_run(part)
         
-        if i % 2 == 1: # This is the number inside [ ]
+        if i % 2 == 1:
             run.font.superscript = True
-            # Optional: Uncomment to set a specific size like in your example
-            # run.font.size = Pt(9) 
         
-        # Apply styles to all parts (superscript or not)
         if bold:
             run.font.bold = True
         if color:
             run.font.color.rgb = color
         if size:
             run.font.size = size
-# --- END OF HELPER FUNCTION ---
 
 
 def processors_section(doc, file):
@@ -53,8 +47,10 @@ def processors_section(doc, file):
             sheet_name_to_use = "Processors"
         elif "Processor" in xls.sheet_names:
             sheet_name_to_use = "Processor"
+        elif "QS-Only Processors" in xls.sheet_names:
+            sheet_name_to_use = "QS-Only Processors"
         else:
-            raise ValueError("Sheet 'Processors' or 'Processor' not found in the Excel file.")
+            raise ValueError("Sheet 'Processors' or 'Processor' or 'QS-Only Processors' not found in the Excel file.")
 
         # Read the sheet
         df = pd.read_excel(file.stream, sheet_name=sheet_name_to_use, engine='openpyxl')
