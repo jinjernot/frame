@@ -9,6 +9,7 @@ from app.routes.qs_tool.core.laptop.tech_specs.memory import memory_section
 from app.routes.qs_tool.core.laptop.tech_specs.networking import networking_section
 from app.routes.qs_tool.core.laptop.tech_specs.audio import audio_section
 from app.routes.qs_tool.core.laptop.tech_specs.keyboard import keyboard_section
+from app.routes.qs_tool.core.laptop.tech_specs.pen import digital_pen_section
 from app.routes.qs_tool.core.laptop.tech_specs.software import software_section
 from app.routes.qs_tool.core.laptop.tech_specs.power import power_section
 from app.routes.qs_tool.core.laptop.tech_specs.dimensions import dimensions_section
@@ -76,12 +77,13 @@ def tech_specs_section(doc, file):
         networking_section(doc, df)
         audio_section(doc, df)
         keyboard_section(doc, df)
+        digital_pen_section(doc, df)
         software_section(doc, df)
         power_section(doc, df)
         dimensions_section(doc, df)
         ports_section(doc, df)
         service_section(doc, df)
-        certification_section(doc, df)
+        #certification_section(doc, df)
         
         
     except Exception as e:

@@ -134,6 +134,6 @@ def insert_table(doc, df):
 
             if footnotes:
                 process_footnotes(doc, footnotes)
-            
+            doc.add_paragraph()
             doc.add_paragraph()
             table_column_widths(table, (Inches(2), Inches(2), Inches(4)))
