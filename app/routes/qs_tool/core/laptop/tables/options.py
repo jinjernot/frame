@@ -17,13 +17,11 @@ def options_section(doc, file):
         # Add title: Options
         insert_title(doc, "OPTIONS")
         
-        paragraph = doc.add_paragraph()
-
-        run = paragraph.add_run("Privacy panel is only available on select models.")
-        run.font.color.rgb = RGBColor(0, 0, 153)
+        # Removed the "Privacy panel is only available on select models." disclaimer
+        
         start_col_idx = 0
         end_col_idx = 2
-        start_row_idx = 3
+        start_row_idx = 2  # Changed from 3 to 2 to include the header row
         end_row_idx = 299
 
         data_range = df.iloc[start_row_idx:end_row_idx+1, start_col_idx:end_col_idx+1]

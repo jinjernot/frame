@@ -4,7 +4,13 @@ import os
 from config import *
 from io import BytesIO
 
-from app.routes.scs_tool.core.process_data import process_data, process_data_granular
+from app.routes.scs_tool.core.process_data import (
+    process_data, 
+    process_data_granular, 
+    process_multiple_containers_parallel,
+    process_multiple_containers_parallel_granular,
+    clear_json_cache
+)
 from app.routes.scs_tool.core.qa_av import av_check
 from app.routes.scs_tool.core.format_data import format_data, format_data_granular
 from app.routes.scs_tool.core.product_line import pl_check
@@ -15,6 +21,7 @@ from app.routes.scs_tool.core.npu_check import npu_check
 def clean_report(file):
     """
     Processes a standard report using the new restructured JSON data.
+    Optimized with parallel processing.
     """
     try:
         # --- 1. Initial Setup & Cleaning ---
@@ -45,14 +52,9 @@ def clean_report(file):
                                     and row['ContainerName'] in group['ContainerName'] for group in groups), axis=1)]
         df = filtered_rows.copy()
 
-        # --- 3. Main Data Processing Loop ---
-        json_files = [f for f in os.listdir(
-            SCS_JSON_PATH) if f.endswith('.json')]
-
-        for json_file in json_files:
-            container_name = os.path.splitext(json_file)[0]
-            json_file_path = os.path.join(SCS_JSON_PATH, json_file)
-            df = process_data(json_file_path, container_name, df)
+        # --- 3. Main Data Processing Loop (PARALLEL) ---
+        # Use parallel processing instead of sequential loop
+        df = process_multiple_containers_parallel(df, SCS_JSON_PATH, container_col='ContainerName', max_workers=8)
 
         # --- 4. NPU Validation Step ---
         df = npu_check(df, NPU_JSON_PATH)
@@ -71,16 +73,22 @@ def clean_report(file):
                 df.to_excel(SCS_REGULAR_FILE_PATH, index=False)
 
         format_data()
+        
+        # Clear cache after processing to free memory
+        clear_json_cache()
+        
         return df
 
     except Exception as e:
         print(f"An error occurred in clean_report: {e}")
+        clear_json_cache()
         return None
 
 
 async def clean_report_granular(file):
     """
     Processes a granular report asynchronously using the new restructured JSON data.
+    Optimized with parallel processing.
     """
     try:
         # --- 1. Initial Setup & Cleaning ---
@@ -99,10 +107,7 @@ async def clean_report_granular(file):
         df_g['Granular Container Value'] = df_g['Granular Container Value'].astype(
             str)
 
-        # --- 2. Data Processing Loop ---
-        json_files = [f for f in os.listdir(
-            SCS_JSON_GRANULAR_PATH) if f.endswith('.json')]
-
+        # --- 2. Data Processing Loop (PARALLEL) ---
         with open(SCS_GRANULAR_COMPONENT_GROUPS_PATH, 'r', encoding='utf-8') as json_file:
             json_data = json.load(json_file)
         groups = json_data['Groups']
@@ -111,11 +116,13 @@ async def clean_report_granular(file):
                                         and row['Granular Container Tag'] in group['ContainerName'] for group in groups), axis=1)]
         df_g = filtered_rows.copy()
 
-        for json_file in json_files:
-            container_name = os.path.splitext(json_file)[0]
-            json_file_path = os.path.join(SCS_JSON_GRANULAR_PATH, json_file)
-
-            df_g = process_data_granular(json_file_path, container_name, df_g)
+        # Use parallel processing instead of sequential loop
+        df_g = process_multiple_containers_parallel_granular(
+            df_g, 
+            SCS_JSON_GRANULAR_PATH, 
+            container_col='Granular Container Tag', 
+            max_workers=8
+        )
 
         # --- 3. Final Checks and Save ---
         df_g = check_missing_fields(df_g, SCS_GRANULAR_COMPONENT_GROUPS_PATH)
@@ -134,8 +141,13 @@ async def clean_report_granular(file):
                 df_g.to_excel(SCS_GRANULAR_FILE_PATH, index=False)
 
         format_data_granular()
+        
+        # Clear cache after processing to free memory
+        clear_json_cache()
+        
         return df_g
 
     except Exception as e:
         print(f"An error occurred in clean_report_granular: {e}")
+        clear_json_cache()
         return None

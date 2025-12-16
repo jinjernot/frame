@@ -110,10 +110,15 @@ def insert_list(doc, df, start_value):
             if i % 2 == 0:
                 run = paragraph.add_run(text_part)
             else:
-
+                # Add non-breaking space before the superscript to keep it with the preceding text
+                # If previous run exists, add the superscript to it directly to prevent line breaks
+                if 'run' in locals() and run and run.text:
+                    # Use zero-width no-break space to ensure the number stays with the text
+                    run.text = run.text.rstrip() + '\u00A0'  # Non-breaking space
+                
                 sup_run = paragraph.add_run(text_part)
                 sup_run.font.superscript = True
-                sup_run.font.size = Pt(9) 
+                sup_run.font.size = Pt(9)
         
         # Add a line break if it's not the last item
         if index < len(non_footnotes) - 1:

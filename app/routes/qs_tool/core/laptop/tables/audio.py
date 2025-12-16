@@ -18,7 +18,7 @@ def audio_section(doc, file):
 
         start_col_idx = 0
         end_col_idx = 1
-        start_row_idx = 5
+        start_row_idx = 4  # Changed from 5 to 4 to include Codec row
         end_row_idx = 12
 
         data_range = df.iloc[start_row_idx:end_row_idx+1, start_col_idx:end_col_idx+1]
@@ -42,7 +42,8 @@ def audio_section(doc, file):
 
         # Bold the first column
         for row in table.rows:
-            row.cells[0].paragraphs[0].runs[0].font.bold = True
+            if row.cells[0].paragraphs and row.cells[0].paragraphs[0].runs:
+                row.cells[0].paragraphs[0].runs[0].font.bold = True
 
 
         # Insert HR

@@ -6,6 +6,7 @@
       "Max Hinge Open Angle",
       "Docking station model name",
       "Total number of supported displays (incl. the notebook display)",
+      "Total number of supported displays (incl.the notebook)",
       "Max. resolutions supported",
       "Dock Connectors",
       "Technical limitations",
@@ -36,6 +37,7 @@
       "Firmware Version",
       "TCG",
       "FIPS 140-2 Compliant",
+      "FIPS 140-3 Compliant",
       "Security Feature ",
       "1st Source",
       "BIOS",
@@ -49,7 +51,9 @@
       "Power Supply",
       "Battery",
       "Battery Recharge Time",
+      "Supported Protocols",
       "Supported Protocols ",
+      "Codec",
       "Codec ",
       "Total number of supported displays (incl.the notebook)display)",
       "Security Features",
@@ -80,6 +84,7 @@
       "Warranty",
       "Integrated Bluetooth® specifications",
       "Secondary Storage",
+      "Secondary Storage (Optional, select countries only)",
       "Packaging and Pallet Dimensions"
     ],
   
@@ -87,10 +92,9 @@
     "Items below may be optional.",
     "Availability may vary by country.",
     "Actual brightness will be lower with touchscreen or HP Sure View.",
-    "Privacy panel is only available on select models.",
-    "Privacy panel is only available on select models",
     "Power supply availability may vary by country.",
     "Battery is internal and not replaceable by customer. Serviceable by warranty.",
+    "Battery is internal and replaceable by customer. Serviceable by warranty.",
     "Weight will vary by configuration. Does not include power adapter.",
     "Front height measurement is near the front edge where the mechanical chassis taper begins. Back height measurement is near the rear edge where the mechanical chassis taper ends."
 
