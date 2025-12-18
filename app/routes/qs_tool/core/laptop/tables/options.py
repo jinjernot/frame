@@ -17,8 +17,6 @@ def options_section(doc, file):
         # Add title: Options
         insert_title(doc, "OPTIONS")
         
-        # Removed the "Privacy panel is only available on select models." disclaimer
-        
         start_col_idx = 0
         end_col_idx = 2
         start_row_idx = 2  # Changed from 3 to 2 to include the header row
