@@ -19,26 +19,38 @@ def options_section(doc, file):
         
         start_col_idx = 0
         end_col_idx = 2
-        start_row_idx = 2  # Changed from 3 to 2 to include the header row
+        header_row_idx = 2  # Row 3 in Excel (Container Name, Description, Part Number)
+        start_row_idx = 3   # Start data from row 4
         end_row_idx = 299
 
+        # Get the header row first
+        header_data = df.iloc[header_row_idx, start_col_idx:end_col_idx+1].tolist()
+        
+        # Get the data rows
         data_range = df.iloc[start_row_idx:end_row_idx+1, start_col_idx:end_col_idx+1]
         data_range = data_range.dropna(how='all')
 
         num_rows, num_cols = data_range.shape
         table = doc.add_table(rows=0, cols=num_cols) 
 
-        table_row_index = 0
+        # Add header row first
+        header_cells = table.add_row().cells
+        for col_idx in range(len(header_data)):
+            header_value = header_data[col_idx]
+            if not pd.isna(header_value) and str(header_value).strip():
+                run = header_cells[col_idx].paragraphs[0].add_run(str(header_value))
+                run.font.bold = True
+        
+        table_row_index = 1  # Start after header
 
         for row_idx in range(num_rows):
             row = data_range.iloc[row_idx]
             if row.isna().all(): 
                 break
             is_section_header = (
-                row_idx > 0 and 
-                not pd.isna(row[0]) and 
-                pd.isna(row[1]) and 
-                pd.isna(row[2])
+                not pd.isna(row.iloc[0]) and 
+                pd.isna(row.iloc[1]) and 
+                pd.isna(row.iloc[2])
             )
 
             if is_section_header:
@@ -48,14 +60,14 @@ def options_section(doc, file):
             table.add_row()
 
             for col_idx in range(num_cols):
-                value = row[col_idx]
+                value = row.iloc[col_idx]
                 
                 cell = table.cell(table_row_index, col_idx) 
                 
                 if not pd.isna(value):
                     run = cell.paragraphs[0].add_run(str(value))
                     
-                    if row_idx == 0 or col_idx == 0:
+                    if col_idx == 0:  # Bold first column (section names and item categories)
                         run.font.bold = True
             
             table_row_index += 1

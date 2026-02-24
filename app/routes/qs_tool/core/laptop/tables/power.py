@@ -18,6 +18,7 @@ def power_section(doc, file):
         
         paragraph = doc.add_paragraph()
         run = paragraph.add_run("Power supply availability may vary by country.")
+        run = paragraph.add_run("Battery is internal and replaceable by customer. Serviceable by warranty.  ")
         run.font.color.rgb = RGBColor(0, 0, 153) 
         paragraph.add_run().add_break(WD_BREAK.LINE)
 

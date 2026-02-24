@@ -52,40 +52,121 @@ def processors_section(doc, file):
         else:
             raise ValueError("Sheet 'Processors' or 'Processor' or 'QS-Only Processors' not found in the Excel file.")
 
-        # Read the sheet
-        df = pd.read_excel(file.stream, sheet_name=sheet_name_to_use, engine='openpyxl')
+        # Read the sheet with header=None to preserve all rows
+        df = pd.read_excel(file.stream, sheet_name=sheet_name_to_use, engine='openpyxl', header=None)
 
         # Add title
         insert_title(doc, "Processors")
 
-        # Dynamically fetch the column names from the third row (index 2) that have data
-        third_row = df.iloc[3]  # Selecting the third row (index 2, but 1-based)
-
-        # Filter to keep columns that have data in the third row
-        filtered_df = df.loc[:, ~third_row.isna()]
-
-        # Remove the rows
-        filtered_df = filtered_df.iloc[3:]
-
-        # Replace "NaN" string values with an empty string
-        filtered_df = filtered_df.fillna('')
-
-        # Convert filtered dataframe to a list of lists (data) for the table
-        data = filtered_df.values.tolist()
+        # Find the main header row by looking for "Cores" keyword (typically row 5, index 4)
+        main_header_idx = None
+        for idx in range(min(10, len(df))):  # Search first 10 rows
+            row_values = df.iloc[idx].astype(str).str.lower()
+            if any('cores' in str(val) and 'p-cores' not in str(val) and 'e-cores' not in str(val) and 'lp e-cores' not in str(val) for val in row_values):
+                main_header_idx = idx
+                break
+        
+        if main_header_idx is None:
+            # Fallback to row 5 (index 4)
+            main_header_idx = 4
+        
+        # Get main header row and check if there's a sub-header row below it
+        main_header_row = df.iloc[main_header_idx]
+        sub_header_idx = main_header_idx + 1
+        sub_header_row = df.iloc[sub_header_idx] if sub_header_idx < len(df) else None
+        
+        # Build structure to track main headers, sub-headers, and columns
+        header_structure = []
+        
+        for col_idx in range(len(main_header_row)):
+            main_val = str(main_header_row.iloc[col_idx]) if not pd.isna(main_header_row.iloc[col_idx]) else ""
+            sub_val = str(sub_header_row.iloc[col_idx]) if sub_header_row is not None and not pd.isna(sub_header_row.iloc[col_idx]) else ""
+            
+            # Track both main and sub headers
+            header_structure.append({
+                'main': main_val if main_val != "nan" else "",
+                'sub': sub_val if sub_val != "nan" else "",
+                'col_idx': col_idx
+            })
+        
+        # Filter out completely empty columns (no main or sub header)
+        header_structure = [h for h in header_structure if h['main'] or h['sub']]
+        non_empty_cols = [h['col_idx'] for h in header_structure]
+        
+        # Extract data rows starting after sub-header row
+        data_start_idx = sub_header_idx + 1 if sub_header_row is not None else main_header_idx + 1
+        data_df = df.iloc[data_start_idx:, non_empty_cols]
+        
+        # Replace NaN with empty string
+        data_df = data_df.fillna('')
 
         # Add the data as a table to the document
-        table = doc.add_table(rows=1, cols=len(data[0]))
+        table = doc.add_table(rows=0, cols=len(header_structure))
         table.autofit = True
 
-        # Add table data
-        for row in data:
-            # Check if the row is empty
-            if 'Footnotes' in row:
-                break  # Exit the loop if footnote row is reached
+        # Create two-row header structure
+        # First header row (main headers)
+        main_header_cells = table.add_row().cells
+        
+        # Track which columns need merging for "Max Turbo Frequency"
+        i = 0
+        while i < len(header_structure):
+            main_header = header_structure[i]['main']
+            sub_header = header_structure[i]['sub']
             
-            row_cells = table.add_row().cells
-            for i, cell_data in enumerate(row):
+            # If this column has a sub-header, it's part of "Max Turbo Frequency"
+            if sub_header:
+                # Find consecutive columns with sub-headers to merge
+                merge_start = i
+                while i < len(header_structure) and header_structure[i]['sub']:
+                    i += 1
+                merge_end = i - 1
                 
+                # Merge cells for "Max Turbo Frequency"
+                if merge_end > merge_start:
+                    merged_cell = main_header_cells[merge_start].merge(main_header_cells[merge_end])
+                    merged_cell.text = ""
+                    paragraph = merged_cell.paragraphs[0]
+                    add_formatted_run(paragraph, "Max Turbo Frequency", bold=True)
+                else:
+                    # Single cell with main header
+                    cell = main_header_cells[merge_start]
+                    cell.text = ""
+                    paragraph = cell.paragraphs[0]
+                    add_formatted_run(paragraph, main_header if main_header else "Max Turbo Frequency", bold=True)
+            else:
+                # No sub-header, use main header
+                cell = main_header_cells[i]
+                cell.text = ""
+                paragraph = cell.paragraphs[0]
+                add_formatted_run(paragraph, main_header, bold=True)
+                i += 1
+        
+        # Second header row (sub-headers)
+        sub_header_cells = table.add_row().cells
+        for i, h in enumerate(header_structure):
+            cell = sub_header_cells[i]
+            cell.text = ""
+            paragraph = cell.paragraphs[0]
+            # Use sub-header if it exists, otherwise leave empty (will be merged vertically with main header)
+            if h['sub']:
+                add_formatted_run(paragraph, h['sub'], bold=True)
+            else:
+                # Merge this cell vertically with the cell above
+                cell.merge(main_header_cells[i])
+
+        # Add data rows
+        for row_data in data_df.values.tolist():
+            # Check if the row contains 'Footnotes' - if so, stop
+            if any('Footnotes' in str(cell) for cell in row_data):
+                break
+            
+            # Skip completely empty rows
+            if all(str(cell).strip() == '' for cell in row_data):
+                continue
+                
+            row_cells = table.add_row().cells
+            for i, cell_data in enumerate(row_data):
                 cell = row_cells[i]
                 cell_text = str(cell_data)
                 
@@ -93,82 +174,69 @@ def processors_section(doc, file):
                 cell.text = "" 
                 paragraph = cell.paragraphs[0]
                 
-                # Check if this specific cell should be bold
-                is_bold = (cell_text == "Processor Family")
+                # Check if this specific cell should be bold (in first column, might be processor name)
+                is_bold = False  # Can add logic here if needed
                 
-                # Use the new helper function to add text
+                # Use the helper function to add text with superscript support
                 add_formatted_run(paragraph, cell_text, bold=is_bold)
-
-        # Remove the first row
-        if len(table.rows) > 1:  # Ensure there are rows to delete
-            table.rows[0]._element.getparent().remove(table.rows[0]._element)
-
-        # Bold the first row (headers) and apply superscript logic
-        for cell in table.rows[0].cells:
-            cell_text = cell.text # Get the text
-            cell.text = "" # Clear it
-            paragraph = cell.paragraphs[0]
-            # Add it back, formatted with bold and superscript
-            add_formatted_run(paragraph, cell_text, bold=True)
 
                     
         doc.add_paragraph()
         # Process Footnotes if available
-        footnotes_index = df[df.eq('Footnotes').any(axis=1)].index.tolist()
-        if footnotes_index:
-            footnotes_index = footnotes_index[0]  
-            footnotes_data = df.iloc[footnotes_index + 1:]  
+        # Find the row containing "Footnotes" text
+        footnotes_row_idx = None
+        for idx in range(len(df)):
+            row_values = df.iloc[idx].astype(str)
+            if any('footnote' in val.lower() for val in row_values):
+                footnotes_row_idx = idx
+                break
+        
+        if footnotes_row_idx is not None:
+            footnotes_data = df.iloc[footnotes_row_idx + 1:]  
             footnotes_data = footnotes_data.dropna(how='all')  
             
-            # Create a single paragraph for all footnotes
-            footnote_paragraph = doc.add_paragraph()
-            first_footnote = True
+            formatted_footnotes = []
             
             # Define the blue color
             footnote_color = RGBColor(0, 0, 153)
 
             # Iterate over rows of footnotes_data and add them to the document
             for _, row in footnotes_data.iterrows():
-                row_values = row.dropna().tolist()
+                # Get first two columns (column B typically has the footnote text)
+                if len(row) < 2:
+                    continue
+                    
+                col_a = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
+                col_b = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else ""
                 
-                if not row_values:
-                    continue # Skip empty rows
-
-                if not first_footnote:
-                    # Add a line break before this new footnote
-                    footnote_paragraph.add_run().add_break(WD_BREAK.LINE)
+                # Skip if both columns are empty
+                if not col_a and not col_b:
+                    continue
                 
-                first_footnote = False
-
-                first_cell = str(row_values[0])
+                # Skip the "Footnote" header row
+                if col_a.lower() == 'footnote' or col_a.lower() == 'footnotes':
+                    continue
                 
-                if 'footnote' in first_cell.lower() and len(row_values) > 1:
-                    # Case: "Footnote 02", "Text..."
-                    footnote_number_str = ''.join(filter(str.isdigit, first_cell))
+                # Check if col_a contains "footnote" with a number
+                if 'footnote' in col_a.lower() and col_b:
+                    # Extract number from "Footnote 2", "Footnote 3", etc.
+                    footnote_number_str = ''.join(filter(str.isdigit, col_a))
                     if footnote_number_str:
                         footnote_number = int(footnote_number_str)
-                        footnote_text = str(row_values[1])
-                        
-                        # Add the number part (e.g., "1. ")
-                        run_num = footnote_paragraph.add_run(f"{footnote_number}. ")
-                        run_num.font.color.rgb = footnote_color
-                        
-                        # Add the text part, processed for superscripts
-                        add_formatted_run(footnote_paragraph, footnote_text, color=footnote_color)
-                    else:
-                        # Fallback: "Footnote", "Text..."
-                        text_to_add = " - ".join(map(str, row_values))
-                        add_formatted_run(footnote_paragraph, text_to_add, color=footnote_color)
-
-                elif len(row_values) == 1:
-                    # Case: (empty), "Multicore text..."
-                    text_to_add = str(row_values[0])
-                    add_formatted_run(footnote_paragraph, text_to_add, color=footnote_color)
-                
-                else:
-                    # Fallback for other formats
-                    text_to_add = " - ".join(map(str, row_values))
-                    add_formatted_run(footnote_paragraph, text_to_add, color=footnote_color)
+                        # Format as "2. Text from column B"
+                        formatted_text = f"{footnote_number}. {col_b}"
+                        formatted_footnotes.append(formatted_text)
+            
+            # Add all footnotes to a single paragraph with line breaks
+            if formatted_footnotes:
+                footnote_paragraph = doc.add_paragraph()
+                for index, footnote_text in enumerate(formatted_footnotes):
+                    # Process the text for superscripts
+                    add_formatted_run(footnote_paragraph, footnote_text, color=footnote_color)
+                    
+                    # Add line break between footnotes (but not after the last one)
+                    if index < len(formatted_footnotes) - 1:
+                        footnote_paragraph.add_run().add_break(WD_BREAK.LINE)
 
 
         # Insert Horizontal Line

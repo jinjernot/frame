@@ -29,12 +29,21 @@ def clean_report(file):
         file_buffer = BytesIO(file_content)
 
         df = pd.read_excel(file_buffer, engine='openpyxl')
+        
+        # Debug: Print actual columns in the Excel file
+        print(f"Columns found in Excel: {df.columns.tolist()}")
+        
         df = df.drop(SCS_COLS_TO_ADD, axis=1, errors='ignore')
         df[SCS_COLS_TO_ADD] = ''
 
         pl_check(df)
 
-        # Basic data cleaning
+        # Basic data cleaning - with column validation
+        required_columns = ['ContainerValue', 'ContainerName', 'PhwebDescription', 'ComponentGroup']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}. Available columns: {df.columns.tolist()}")
+        
         df = df[df['ContainerValue'] != '[BLANK]'].dropna(
             subset=['ContainerValue', 'ContainerName'])
         df.replace('\u00A0', ' ', regex=True, inplace=True)
@@ -96,8 +105,18 @@ async def clean_report_granular(file):
         file_buffer = BytesIO(file_content)
 
         df_g = pd.read_excel(file_buffer, engine='openpyxl')
+        
+        # Debug: Print actual columns in the Excel file
+        print(f"Columns found in Granular Excel: {df_g.columns.tolist()}")
+        
         df_g = df_g.drop(SCS_COLS_TO_DROP_GRANULAR, axis=1, errors='ignore')
         df_g[SCS_COLS_TO_ADD] = ''
+
+        # Validate required columns
+        required_granular_columns = ['Granular Container Value', 'Granular Container Tag', 'SCSGroup']
+        missing_columns = [col for col in required_granular_columns if col not in df_g.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}. Available columns: {df_g.columns.tolist()}")
 
         df_g = df_g.dropna(
             subset=['Granular Container Value', 'Granular Container Tag'])

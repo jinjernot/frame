@@ -15,6 +15,12 @@ def audio_section(doc, file):
 
         # Add title: AUDIO
         insert_title(doc, "AUDIO")
+        
+                
+        paragraph = doc.add_paragraph()
+        run = paragraph.add_run("Privacy panel is only available on select models.")
+        run.font.color.rgb = RGBColor(0, 0, 153) 
+        paragraph.add_run().add_break(WD_BREAK.LINE)
 
         start_col_idx = 0
         end_col_idx = 1

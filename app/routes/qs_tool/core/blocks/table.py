@@ -57,7 +57,20 @@ def insert_table(doc, df):
                 col_b_val = str(df.iloc[i, 1]).strip().lower()
                 is_footnote_marker = col_a_val in ['footnote', 'footnotes'] or col_b_val in ['footnote', 'footnotes']
                 
-                if df.iloc[i, 0] == "Table":
+                # Check for container markers that indicate end of table or section separators
+                is_container_marker = (
+                    col_a_val == 'container name' or 
+                    col_a_val == 'wireless wan' or 
+                    col_a_val == 'wired lan' or 
+                    col_a_val == 'wireless lpwan (low power)' or
+                    col_a_val == 'power' or  # Added to skip Power section header
+                    (col_a_val == 'wireless wan' and col_b_val == '') or
+                    (col_b_val == 'value' and col_a_val == 'container name') or
+                    (col_b_val == 'value' and col_a_val == 'power')  # Skip Power | Value rows
+                )
+                
+                # Stop if we hit another table or a container marker
+                if df.iloc[i, 0] == "Table" or is_container_marker:
                     break
                 
                 elif is_footnote_marker:
@@ -109,12 +122,18 @@ def insert_table(doc, df):
 
                     text_data = clean_text(str(df.iloc[i, 1]))
                     split_data = pattern.split(text_data)
+                    
+                    # Check if this is a section header (column A is empty/blank and column B has text)
+                    is_section_header = (not str(df.iloc[i, 0]).strip() or df.iloc[i, 0] == '') and text_data.strip()
 
                     for k, text_part in enumerate(split_data):
                         run = paragraph_2.add_run(text_part)
                         if k % 2 == 1:
                             run.font.superscript = True
                             run.font.size = Pt(9)
+                        # Make text bold if it's a section header (like "Integrated Bluetooth® specifications")
+                        if is_section_header and k % 2 == 0:
+                            run.font.bold = True
 
             cell_0 = table.cell(1, 0)
             paragraph_0 = cell_0.paragraphs[0]

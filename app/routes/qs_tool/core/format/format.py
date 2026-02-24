@@ -90,8 +90,8 @@ def format_document(doc, file, imgs_path):
     """
     # <<< LOGIC MODIFIED
     # Read both lists from the JSON file
-    bold_words, blue_words = read_format_words_from_json('/home/garciagi/frame/app/routes/qs_tool/core/format/bold_words.json')
-    #bold_words, blue_words = read_format_words_from_json('app/core/format/bold_words.json')
+    #bold_words, blue_words = read_format_words_from_json('/home/garciagi/frame/app/routes/qs_tool/core/format/bold_words.json')
+    bold_words, blue_words = read_format_words_from_json('app/routes/qs_tool/core/format/bold_words.json')
     
     header(doc, file)
     footer(doc, imgs_path)
