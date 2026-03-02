@@ -31,17 +31,15 @@ def options_section(doc, file):
         data_range = data_range.dropna(how='all')
 
         num_rows, num_cols = data_range.shape
-        table = doc.add_table(rows=0, cols=num_cols) 
+        table = doc.add_table(rows=1, cols=num_cols)
 
         # Add header row first
-        header_cells = table.add_row().cells
+        header_cells = table.rows[0].cells
         for col_idx in range(len(header_data)):
             header_value = header_data[col_idx]
             if not pd.isna(header_value) and str(header_value).strip():
                 run = header_cells[col_idx].paragraphs[0].add_run(str(header_value))
                 run.font.bold = True
-        
-        table_row_index = 1  # Start after header
 
         for row_idx in range(num_rows):
             row = data_range.iloc[row_idx]
@@ -53,24 +51,16 @@ def options_section(doc, file):
                 pd.isna(row.iloc[2])
             )
 
-            if is_section_header:
-                table.add_row()
-                table_row_index += 1
-
-            table.add_row()
+            row_cells = table.add_row().cells
 
             for col_idx in range(num_cols):
                 value = row.iloc[col_idx]
                 
-                cell = table.cell(table_row_index, col_idx) 
-                
                 if not pd.isna(value):
-                    run = cell.paragraphs[0].add_run(str(value))
+                    run = row_cells[col_idx].paragraphs[0].add_run(str(value))
                     
                     if col_idx == 0:  # Bold first column (section names and item categories)
                         run.font.bold = True
-            
-            table_row_index += 1
                             
         table_column_widths(table, (Inches(2), Inches(4), Inches(2)))
 

@@ -1,5 +1,6 @@
 from app.routes.qs_tool.core.format.header import header
 from app.routes.qs_tool.core.format.footer import footer
+from config import QS_BOLD_WORDS
 import json
 
 from docx.shared import Pt
@@ -90,8 +91,7 @@ def format_document(doc, file, imgs_path):
     """
     # <<< LOGIC MODIFIED
     # Read both lists from the JSON file
-    #bold_words, blue_words = read_format_words_from_json('/home/garciagi/frame/app/routes/qs_tool/core/format/bold_words.json')
-    bold_words, blue_words = read_format_words_from_json('app/routes/qs_tool/core/format/bold_words.json')
+    bold_words, blue_words = read_format_words_from_json(QS_BOLD_WORDS)
     
     header(doc, file)
     footer(doc, imgs_path)
