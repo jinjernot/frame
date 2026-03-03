@@ -12,7 +12,7 @@ def options_section(doc, file):
 
     try:
         # Load xlsx
-        df = pd.read_excel(file.stream, sheet_name='QS-Only Options', engine='openpyxl')
+        df = pd.read_excel(file.stream, sheet_name='QS-Only Options', engine='openpyxl', header=None)
 
         # Add title: Options
         insert_title(doc, "OPTIONS")
@@ -32,6 +32,7 @@ def options_section(doc, file):
 
         num_rows, num_cols = data_range.shape
         table = doc.add_table(rows=1, cols=num_cols)
+        table.autofit = False
 
         # Add header row first
         header_cells = table.rows[0].cells
@@ -45,12 +46,6 @@ def options_section(doc, file):
             row = data_range.iloc[row_idx]
             if row.isna().all(): 
                 break
-            is_section_header = (
-                not pd.isna(row.iloc[0]) and 
-                pd.isna(row.iloc[1]) and 
-                pd.isna(row.iloc[2])
-            )
-
             row_cells = table.add_row().cells
 
             for col_idx in range(num_cols):
@@ -63,6 +58,13 @@ def options_section(doc, file):
                         run.font.bold = True
                             
         table_column_widths(table, (Inches(2), Inches(4), Inches(2)))
+
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    paragraph.paragraph_format.space_before = Pt(0)
+                    paragraph.paragraph_format.space_after = Pt(0)
+                    paragraph.paragraph_format.line_spacing = 1
 
         # Insert HR
         insert_horizontal_line(doc.add_paragraph(), thickness=3)
