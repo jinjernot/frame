@@ -58,6 +58,29 @@ def processors_section(doc, file):
         # Add title
         insert_title(doc, "Processors")
 
+        # Find the explicit row containing "Footnote"/"Footnotes" section header.
+        # We use this index to keep footnotes out of the table body.
+        footnotes_row_idx = None
+        for idx in range(len(df)):
+            row_values = [str(val).strip().lower() for val in df.iloc[idx].tolist() if str(val).strip()]
+            if any(val in ('footnote', 'footnotes') for val in row_values):
+                footnotes_row_idx = idx
+                break
+
+        # Find optional "Processor Family" subtitle row.
+        processor_family_row_idx = None
+        processor_family_col_idx = None
+        for idx in range(len(df)):
+            row = df.iloc[idx].tolist()
+            for col_idx, val in enumerate(row):
+                val_str = str(val).strip().lower()
+                if val_str and val_str != 'nan' and 'processor family' in val_str:
+                    processor_family_row_idx = idx
+                    processor_family_col_idx = col_idx
+                    break
+            if processor_family_row_idx is not None:
+                break
+
         # Find the main header row by looking for "Cores" keyword (typically row 5, index 4)
         main_header_idx = None
         for idx in range(min(10, len(df))):  # Search first 10 rows
@@ -95,7 +118,13 @@ def processors_section(doc, file):
         
         # Extract data rows starting after sub-header row
         data_start_idx = sub_header_idx + 1 if sub_header_row is not None else main_header_idx + 1
-        data_df = df.iloc[data_start_idx:, non_empty_cols]
+        data_end_candidates = [len(df)]
+        if footnotes_row_idx is not None:
+            data_end_candidates.append(footnotes_row_idx)
+        if processor_family_row_idx is not None:
+            data_end_candidates.append(processor_family_row_idx)
+        data_end_idx = min(data_end_candidates)
+        data_df = df.iloc[data_start_idx:data_end_idx, non_empty_cols]
         
         # Replace NaN with empty string
         data_df = data_df.fillna('')
@@ -157,8 +186,11 @@ def processors_section(doc, file):
 
         # Add data rows
         for row_data in data_df.values.tolist():
-            # Check if the row contains 'Footnotes' - if so, stop
-            if any('Footnotes' in str(cell) for cell in row_data):
+            # Stop table population when the footnotes section starts.
+            row_data_lower = [str(cell).strip().lower() for cell in row_data]
+            if any('footnote' in cell for cell in row_data_lower):
+                break
+            if any('processor family' in cell for cell in row_data_lower):
                 break
             
             # Skip completely empty rows
@@ -180,22 +212,53 @@ def processors_section(doc, file):
                 # Use the helper function to add text with superscript support
                 add_formatted_run(paragraph, cell_text, bold=is_bold)
 
-                    
-        doc.add_paragraph()
-        # Process Footnotes if available
-        # Find the row containing "Footnotes" text
-        footnotes_row_idx = None
-        for idx in range(len(df)):
-            row_values = df.iloc[idx].astype(str)
-            if any('footnote' in val.lower() for val in row_values):
-                footnotes_row_idx = idx
-                break
-        
+        # Render "Processor Family" and the following values as normal techspec text.
+        if processor_family_row_idx is not None:
+            subtitle_paragraph = doc.add_paragraph()
+            add_formatted_run(subtitle_paragraph, "Processor Family", bold=True, size=Pt(12))
+            values_start_idx = processor_family_row_idx + 1
+            values_end_idx = footnotes_row_idx if footnotes_row_idx is not None else len(df)
+            processor_family_values = []
+            seen_processor_family_values = set()
+
+            for idx in range(values_start_idx, values_end_idx):
+                row = df.iloc[idx]
+                selected_value = ""
+
+                # Prefer the same column where "Processor Family" was found.
+                if processor_family_col_idx is not None and processor_family_col_idx < len(row):
+                    candidate = str(row.iloc[processor_family_col_idx]).strip() if not pd.isna(row.iloc[processor_family_col_idx]) else ""
+                    if candidate and candidate.lower() != 'nan':
+                        selected_value = candidate
+
+                # Fallback: first non-empty cell in the row.
+                if not selected_value:
+                    row_values = [str(val).strip() for val in row.tolist() if str(val).strip() and str(val).strip().lower() != 'nan']
+                    if row_values:
+                        selected_value = row_values[0]
+
+                if not selected_value:
+                    continue
+                if selected_value.lower() not in ('footnote', 'footnotes'):
+                    if selected_value not in seen_processor_family_values:
+                        seen_processor_family_values.add(selected_value)
+                        processor_family_values.append(selected_value)
+
+            if processor_family_values:
+                values_paragraph = doc.add_paragraph()
+                for idx, value in enumerate(processor_family_values):
+                    add_formatted_run(values_paragraph, value)
+                    if idx < len(processor_family_values) - 1:
+                        values_paragraph.add_run().add_break(WD_BREAK.LINE)
+
+        # Process footnotes if available
         if footnotes_row_idx is not None:
+            doc.add_paragraph()
             footnotes_data = df.iloc[footnotes_row_idx + 1:]  
             footnotes_data = footnotes_data.dropna(how='all')  
             
             formatted_footnotes = []
+            seen_footnotes = set()
             
             # Define the blue color
             footnote_color = RGBColor(0, 0, 153)
@@ -225,7 +288,9 @@ def processors_section(doc, file):
                         footnote_number = int(footnote_number_str)
                         # Format as "2. Text from column B"
                         formatted_text = f"{footnote_number}. {col_b}"
-                        formatted_footnotes.append(formatted_text)
+                        if formatted_text not in seen_footnotes:
+                            seen_footnotes.add(formatted_text)
+                            formatted_footnotes.append(formatted_text)
             
             # Add all footnotes to a single paragraph with line breaks
             if formatted_footnotes:

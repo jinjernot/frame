@@ -77,6 +77,10 @@ def system_unit_section(doc, file):
             for col_idx in range(num_cols):
                 value = data_range.iat[row_idx, col_idx]
                 cell = table.cell(row_idx, col_idx)
+                is_section_header_row = (
+                    str(data_range.iat[row_idx, 0]).strip() != '' and
+                    (num_cols < 2 or str(data_range.iat[row_idx, 1]).strip() == '')
+                )
                 
                 if not pd.isna(value):
                     data = str(value)
@@ -88,6 +92,9 @@ def system_unit_section(doc, file):
                         if i % 2 == 1:  # If it's a matched number
                             run.font.superscript = True  # Apply superscript
                             run.font.size = Pt(9)  # Adjust font size
+                        elif is_section_header_row and col_idx == 0:
+                            # Bold labels like Temperature, Relative Humidity, etc.
+                            run.font.bold = True
 
         # Bold the first column
         #for row in table.rows:
