@@ -6,41 +6,21 @@ from app.routes.qs_tool.core.format.hr import *
 from docx.enum.text import WD_BREAK
 import pandas as pd
 
-NO_BOLD_POWER_LABELS = {
-    "Weight(DC Cable Included)",
-    "Input",
-    "Input Efficiency",
-    "Input frequency range",
-    "Input AC current",
-    "Output power",
-    "DC output",
-    "Hold-up time",
-    "Output Over Current",
-    "Protection",
-    "AC Inlet Type",
-    "DC Cable Connector",
-    "DC Cable Material",
-    "Connector",
-    "Operating temperature",
-    "Non - operating(storage)",
-    "temperature",
-    "Altitude",
-    "Humidity",
-    "Storage Humidity",
-    "EMI and Safety",
-    "Certifications",
-}
-
-
 def unbold_power_labels(doc, table_count_before):
-    """Remove bold styling from labels in all tables added by the power section."""
+    """In power tables: bold only section header rows (label with no value).
+    Any label row that has a value in col 2 should not be bold."""
     for table in doc.tables[table_count_before:]:
         for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
+            cells = row.cells
+            if len(cells) < 3:
+                continue
+            label_text = cells[1].text.strip()
+            value_text = cells[2].text.strip()
+            # Data label row: has both a label and a value → remove bold from label
+            if label_text and value_text:
+                for paragraph in cells[1].paragraphs:
                     for run in paragraph.runs:
-                        if run.text.strip() in NO_BOLD_POWER_LABELS:
-                            run.font.bold = False
+                        run.font.bold = False
 
 
 def power_section(doc, file):

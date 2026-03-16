@@ -77,9 +77,11 @@ def system_unit_section(doc, file):
             for col_idx in range(num_cols):
                 value = data_range.iat[row_idx, col_idx]
                 cell = table.cell(row_idx, col_idx)
+                col0_val = str(data_range.iat[row_idx, 0]).strip()
+                col1_val = str(data_range.iat[row_idx, 1]).strip() if num_cols >= 2 else ''
                 is_section_header_row = (
-                    str(data_range.iat[row_idx, 0]).strip() != '' and
-                    (num_cols < 2 or str(data_range.iat[row_idx, 1]).strip() == '')
+                    col0_val not in ('', 'nan') and
+                    col1_val in ('', 'nan')
                 )
                 
                 if not pd.isna(value):

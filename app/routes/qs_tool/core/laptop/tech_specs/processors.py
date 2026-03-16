@@ -98,17 +98,27 @@ def processors_section(doc, file):
         sub_header_idx = main_header_idx + 1
         sub_header_row = df.iloc[sub_header_idx] if sub_header_idx < len(df) else None
         
-        # Build structure to track main headers, sub-headers, and columns
+        # Meta/tracking column names that should never appear in the output table.
+        META_COLUMNS = {'owner', 'comments', 'owner check', 'owner check (y/n)', 'check', 'notes', 'remarks'}
+
+        # Build structure to track main headers, sub-headers, and columns.
+        # Stop as soon as a meta/tracking column is encountered.
         header_structure = []
         
         for col_idx in range(len(main_header_row)):
             main_val = str(main_header_row.iloc[col_idx]) if not pd.isna(main_header_row.iloc[col_idx]) else ""
+            main_val = main_val if main_val != "nan" else ""
             sub_val = str(sub_header_row.iloc[col_idx]) if sub_header_row is not None and not pd.isna(sub_header_row.iloc[col_idx]) else ""
-            
+            sub_val = sub_val if sub_val != "nan" else ""
+
+            # Stop collecting columns when a meta/tracking column is reached.
+            if main_val.strip().lower() in META_COLUMNS:
+                break
+
             # Track both main and sub headers
             header_structure.append({
-                'main': main_val if main_val != "nan" else "",
-                'sub': sub_val if sub_val != "nan" else "",
+                'main': main_val,
+                'sub': sub_val,
                 'col_idx': col_idx
             })
         
