@@ -45,7 +45,10 @@ def insert_table(doc, df):
     pattern = re.compile(r"\[(\d+)\]") 
 
     for index, row in df.iterrows():
-        if row[0] == "Table":
+        first_cell = row.iloc[0] if len(row) > 0 else ""
+        second_cell = row.iloc[1] if len(row) > 1 else ""
+
+        if first_cell == "Table":
             page_width = doc.sections[0].page_width - doc.sections[0].left_margin - doc.sections[0].right_margin
 
             table = doc.add_table(rows=1, cols=3)
@@ -138,7 +141,7 @@ def insert_table(doc, df):
             cell_0 = table.cell(1, 0)
             paragraph_0 = cell_0.paragraphs[0]
 
-            text_data = clean_text(str(row[1]))
+            text_data = clean_text(str(second_cell))
             split_data = pattern.split(text_data)
 
             for k, text_part in enumerate(split_data):

@@ -39,7 +39,7 @@ def processors_section(doc, file):
     """Processors techspecs section"""
 
     try:
-        # Load Excel file and check if "Processors" or "Processor" sheet exists
+        # Load Excel file and check available processors sheet names.
         xls = pd.ExcelFile(file.stream, engine='openpyxl')
         sheet_name_to_use = None
         
@@ -52,207 +52,198 @@ def processors_section(doc, file):
         else:
             raise ValueError("Sheet 'Processors' or 'Processor' or 'QS-Only Processors' not found in the Excel file.")
 
-        # Read the sheet with header=None to preserve all rows
+        # Read the sheet with header=None to preserve the original structure.
         df = pd.read_excel(file.stream, sheet_name=sheet_name_to_use, engine='openpyxl', header=None)
+        df = df.fillna("")
 
         # Add title
         insert_title(doc, "Processors")
 
-        # Find the explicit row containing "Footnote"/"Footnotes" section header.
-        # We use this index to keep footnotes out of the table body.
-        footnotes_row_idx = None
+        # Locate the table header row that contains "Processor" and "Cores".
+        header_row_idx = None
         for idx in range(len(df)):
-            row_values = [str(val).strip().lower() for val in df.iloc[idx].tolist() if str(val).strip()]
-            if any(val in ('footnote', 'footnotes') for val in row_values):
-                footnotes_row_idx = idx
+            row_values = [str(v).strip().lower() for v in df.iloc[idx].tolist()]
+            if "processor" in row_values and "cores" in row_values:
+                header_row_idx = idx
                 break
 
-        # Find optional "Processor Family" subtitle row.
-        processor_family_row_idx = None
-        processor_family_col_idx = None
-        for idx in range(len(df)):
-            row = df.iloc[idx].tolist()
-            for col_idx, val in enumerate(row):
-                val_str = str(val).strip().lower()
-                if val_str and val_str != 'nan' and 'processor family' in val_str:
-                    processor_family_row_idx = idx
-                    processor_family_col_idx = col_idx
-                    break
-            if processor_family_row_idx is not None:
-                break
+        if header_row_idx is None:
+            raise ValueError("Could not find Processors table header row.")
 
-        # Find the main header row by looking for "Cores" keyword (typically row 5, index 4)
-        main_header_idx = None
-        for idx in range(min(10, len(df))):  # Search first 10 rows
-            row_values = df.iloc[idx].astype(str).str.lower()
-            if any('cores' in str(val) and 'p-cores' not in str(val) and 'e-cores' not in str(val) and 'lp e-cores' not in str(val) for val in row_values):
-                main_header_idx = idx
-                break
-        
-        if main_header_idx is None:
-            # Fallback to row 5 (index 4)
-            main_header_idx = 4
-        
-        # Get main header row and check if there's a sub-header row below it
-        main_header_row = df.iloc[main_header_idx]
-        sub_header_idx = main_header_idx + 1
-        sub_header_row = df.iloc[sub_header_idx] if sub_header_idx < len(df) else None
-        
-        # Meta/tracking column names that should never appear in the output table.
-        META_COLUMNS = {'owner', 'comments', 'owner check', 'owner check (y/n)', 'check', 'notes', 'remarks'}
+        header_row = df.iloc[header_row_idx]
 
-        # Build structure to track main headers, sub-headers, and columns.
-        # Stop as soon as a meta/tracking column is encountered.
+        # Detect optional split sub-header row (e.g., P-cores / E-cores / LP E-cores).
+        sub_header_row_idx = None
+        if header_row_idx + 1 < len(df):
+            candidate = [str(v).strip().lower() for v in df.iloc[header_row_idx + 1].tolist()]
+            if any(v in {"p-cores", "e-cores", "lp e-cores", "number of p-cores", "number of e-cores", "number of lp e-cores"} for v in candidate):
+                sub_header_row_idx = header_row_idx + 1
+
+        # Determine the start column from "Processor" and stop before owner/meta columns.
+        start_col_idx = None
         header_structure = []
-        
-        for col_idx in range(len(main_header_row)):
-            main_val = str(main_header_row.iloc[col_idx]) if not pd.isna(main_header_row.iloc[col_idx]) else ""
-            main_val = main_val if main_val != "nan" else ""
-            sub_val = str(sub_header_row.iloc[col_idx]) if sub_header_row is not None and not pd.isna(sub_header_row.iloc[col_idx]) else ""
-            sub_val = sub_val if sub_val != "nan" else ""
+        meta_columns = {
+            "owner",
+            "owner check",
+            "owner check (y/n)",
+            "comments",
+            "check",
+            "notes",
+            "remarks",
+        }
 
-            # Stop collecting columns when a meta/tracking column is reached.
-            if main_val.strip().lower() in META_COLUMNS:
+        last_main_header = ""
+        for col_idx in range(len(header_row)):
+            main_raw = str(header_row.iloc[col_idx]).strip()
+            main_lower = main_raw.lower()
+            sub_raw = ""
+            if sub_header_row_idx is not None:
+                sub_raw = str(df.iloc[sub_header_row_idx, col_idx]).strip()
+            sub_lower = sub_raw.lower()
+
+            if start_col_idx is None and main_lower == "processor":
+                start_col_idx = col_idx
+
+            if start_col_idx is None:
+                continue
+
+            if main_lower in meta_columns or sub_lower in meta_columns:
                 break
 
-            # Track both main and sub headers
-            header_structure.append({
-                'main': main_val,
-                'sub': sub_val,
-                'col_idx': col_idx
-            })
-        
-        # Filter out completely empty columns (no main or sub header)
-        header_structure = [h for h in header_structure if h['main'] or h['sub']]
-        non_empty_cols = [h['col_idx'] for h in header_structure]
-        
-        # Extract data rows starting after sub-header row
-        data_start_idx = sub_header_idx + 1 if sub_header_row is not None else main_header_idx + 1
-        data_end_candidates = [len(df)]
-        if footnotes_row_idx is not None:
-            data_end_candidates.append(footnotes_row_idx)
-        if processor_family_row_idx is not None:
-            data_end_candidates.append(processor_family_row_idx)
-        data_end_idx = min(data_end_candidates)
-        data_df = df.iloc[data_start_idx:data_end_idx, non_empty_cols]
-        
-        # Replace NaN with empty string
-        data_df = data_df.fillna('')
+            # Fill merged/split main headers across blank main cells when sub-headers exist.
+            effective_main = main_raw
+            if effective_main:
+                last_main_header = effective_main
+            elif sub_raw and last_main_header:
+                effective_main = last_main_header
 
-        # Add the data as a table to the document
-        table = doc.add_table(rows=0, cols=len(header_structure))
+            # Keep columns that carry an explicit main or sub header.
+            # This keeps split columns like K/L while skipping totally empty spacer columns.
+            if not main_raw and not sub_raw:
+                continue
+
+            header_structure.append({
+                "col_idx": col_idx,
+                "main": effective_main,
+                "sub": sub_raw,
+            })
+
+        if not header_structure:
+            raise ValueError("No Processors table columns found.")
+
+        # Add optional subtitle from the row above (e.g., "Processors - AMD").
+        if header_row_idx > 0:
+            subtitle_row = df.iloc[header_row_idx - 1]
+            subtitle_candidate = ""
+            subtitle_col = start_col_idx if start_col_idx is not None else header_structure[0]["col_idx"]
+            if subtitle_col < len(subtitle_row):
+                subtitle_candidate = str(subtitle_row.iloc[subtitle_col]).strip()
+
+            if subtitle_candidate and subtitle_candidate.lower() != "nan":
+                subtitle_paragraph = doc.add_paragraph()
+                add_formatted_run(subtitle_paragraph, subtitle_candidate, bold=True, size=Pt(12))
+
+        # Track marker rows.
+        footnotes_row_idx = None
+        processor_family_row_idx = None
+        for idx in range(header_row_idx + 1, len(df)):
+            row_values = [str(v).strip().lower() for v in df.iloc[idx].tolist() if str(v).strip()]
+            if footnotes_row_idx is None and any(v in ("footnote", "footnotes") for v in row_values):
+                footnotes_row_idx = idx
+            if processor_family_row_idx is None and any("processor family" in v for v in row_values):
+                processor_family_row_idx = idx
+
+        # Build data range until the first marker section.
+        data_end_idx = len(df)
+        if processor_family_row_idx is not None:
+            data_end_idx = min(data_end_idx, processor_family_row_idx)
+        if footnotes_row_idx is not None:
+            data_end_idx = min(data_end_idx, footnotes_row_idx)
+
+        selected_cols = [h["col_idx"] for h in header_structure]
+        data_start_idx = header_row_idx + (2 if sub_header_row_idx is not None else 1)
+        data_df = df.iloc[data_start_idx:data_end_idx, selected_cols].copy()
+
+        # Create processors table with one or two header rows.
+        has_subheaders = any(str(h["sub"]).strip() for h in header_structure)
+        table = doc.add_table(rows=2 if has_subheaders else 1, cols=len(header_structure))
         table.autofit = True
 
-        # Create two-row header structure
-        # First header row (main headers)
-        main_header_cells = table.add_row().cells
-        
-        # Track which columns need merging for "Max Turbo Frequency"
-        i = 0
-        while i < len(header_structure):
-            main_header = header_structure[i]['main']
-            sub_header = header_structure[i]['sub']
-            
-            # If this column has a sub-header, it's part of "Max Turbo Frequency"
-            if sub_header:
-                # Find consecutive columns with sub-headers to merge
-                merge_start = i
-                while i < len(header_structure) and header_structure[i]['sub']:
-                    i += 1
-                merge_end = i - 1
-                
-                # Merge cells for "Max Turbo Frequency"
-                if merge_end > merge_start:
-                    merged_cell = main_header_cells[merge_start].merge(main_header_cells[merge_end])
-                    merged_cell.text = ""
-                    paragraph = merged_cell.paragraphs[0]
-                    add_formatted_run(paragraph, "Max Turbo Frequency", bold=True)
-                else:
-                    # Single cell with main header
-                    cell = main_header_cells[merge_start]
-                    cell.text = ""
-                    paragraph = cell.paragraphs[0]
-                    add_formatted_run(paragraph, main_header if main_header else "Max Turbo Frequency", bold=True)
-            else:
-                # No sub-header, use main header
-                cell = main_header_cells[i]
-                cell.text = ""
-                paragraph = cell.paragraphs[0]
-                add_formatted_run(paragraph, main_header, bold=True)
-                i += 1
-        
-        # Second header row (sub-headers)
-        sub_header_cells = table.add_row().cells
-        for i, h in enumerate(header_structure):
-            cell = sub_header_cells[i]
-            cell.text = ""
-            paragraph = cell.paragraphs[0]
-            # Use sub-header if it exists, otherwise leave empty (will be merged vertically with main header)
-            if h['sub']:
-                add_formatted_run(paragraph, h['sub'], bold=True)
-            else:
-                # Merge this cell vertically with the cell above
-                cell.merge(main_header_cells[i])
+        if has_subheaders:
+            main_cells = table.rows[0].cells
+            sub_cells = table.rows[1].cells
 
-        # Add data rows
-        for row_data in data_df.values.tolist():
-            # Stop table population when the footnotes section starts.
-            row_data_lower = [str(cell).strip().lower() for cell in row_data]
-            if any('footnote' in cell for cell in row_data_lower):
-                break
-            if any('processor family' in cell for cell in row_data_lower):
-                break
-            
-            # Skip completely empty rows
-            if all(str(cell).strip() == '' for cell in row_data):
+            for i, header_info in enumerate(header_structure):
+                main_cells[i].text = ""
+                sub_cells[i].text = ""
+                add_formatted_run(main_cells[i].paragraphs[0], header_info["main"], bold=True)
+                if header_info["sub"]:
+                    add_formatted_run(sub_cells[i].paragraphs[0], header_info["sub"], bold=True)
+
+            # Horizontal merge for grouped main headers (e.g., Max Turbo Frequency over J/K/L).
+            group_start = 0
+            while group_start < len(header_structure):
+                group_main = header_structure[group_start]["main"]
+                group_end = group_start
+                while group_end + 1 < len(header_structure) and header_structure[group_end + 1]["main"] == group_main:
+                    group_end += 1
+
+                if group_end > group_start:
+                    merged = main_cells[group_start].merge(main_cells[group_end])
+                    merged.text = ""
+                    add_formatted_run(merged.paragraphs[0], group_main, bold=True)
+
+                group_start = group_end + 1
+
+            # Vertical merge for non-split columns.
+            for i, header_info in enumerate(header_structure):
+                if not str(header_info["sub"]).strip():
+                    sub_cells[i].merge(main_cells[i])
+        else:
+            header_cells = table.rows[0].cells
+            for i, header_info in enumerate(header_structure):
+                header_cells[i].text = ""
+                add_formatted_run(header_cells[i].paragraphs[0], header_info["main"], bold=True)
+
+        for _, data_row in data_df.iterrows():
+            row_values = [str(v).strip() for v in data_row.tolist()]
+
+            # Skip empty rows in the body.
+            if not any(row_values):
                 continue
-                
-            row_cells = table.add_row().cells
-            for i, cell_data in enumerate(row_data):
-                cell = row_cells[i]
-                cell_text = str(cell_data)
-                
-                # Clear existing paragraph content
-                cell.text = "" 
-                paragraph = cell.paragraphs[0]
-                
-                # Check if this specific cell should be bold (in first column, might be processor name)
-                is_bold = False  # Can add logic here if needed
-                
-                # Use the helper function to add text with superscript support
-                add_formatted_run(paragraph, cell_text, bold=is_bold)
 
-        # Render "Processor Family" and the following values as normal techspec text.
+            # Defensive guard if markers are embedded in selected columns.
+            row_values_lower = [v.lower() for v in row_values]
+            if any("footnote" in v for v in row_values_lower):
+                break
+            if any("processor family" in v for v in row_values_lower):
+                break
+
+            row_cells = table.add_row().cells
+            for i, cell_text in enumerate(row_values):
+                row_cells[i].text = ""
+                add_formatted_run(row_cells[i].paragraphs[0], cell_text)
+
+        # Render "Processor Family" list after the table.
         if processor_family_row_idx is not None:
             subtitle_paragraph = doc.add_paragraph()
             add_formatted_run(subtitle_paragraph, "Processor Family", bold=True, size=Pt(12))
-            values_start_idx = processor_family_row_idx + 1
-            values_end_idx = footnotes_row_idx if footnotes_row_idx is not None else len(df)
+
             processor_family_values = []
             seen_processor_family_values = set()
+            values_end_idx = footnotes_row_idx if footnotes_row_idx is not None else len(df)
 
-            for idx in range(values_start_idx, values_end_idx):
-                row = df.iloc[idx]
-                selected_value = ""
-
-                # Prefer the same column where "Processor Family" was found.
-                if processor_family_col_idx is not None and processor_family_col_idx < len(row):
-                    candidate = str(row.iloc[processor_family_col_idx]).strip() if not pd.isna(row.iloc[processor_family_col_idx]) else ""
-                    if candidate and candidate.lower() != 'nan':
-                        selected_value = candidate
-
-                # Fallback: first non-empty cell in the row.
-                if not selected_value:
-                    row_values = [str(val).strip() for val in row.tolist() if str(val).strip() and str(val).strip().lower() != 'nan']
-                    if row_values:
-                        selected_value = row_values[0]
-
-                if not selected_value:
+            for idx in range(processor_family_row_idx + 1, values_end_idx):
+                row_values = [str(v).strip() for v in df.iloc[idx].tolist() if str(v).strip() and str(v).strip().lower() != "nan"]
+                if not row_values:
                     continue
-                if selected_value.lower() not in ('footnote', 'footnotes'):
-                    if selected_value not in seen_processor_family_values:
-                        seen_processor_family_values.add(selected_value)
-                        processor_family_values.append(selected_value)
+
+                value = row_values[0]
+                if value.lower() in ("footnote", "footnotes"):
+                    continue
+                if value not in seen_processor_family_values:
+                    seen_processor_family_values.add(value)
+                    processor_family_values.append(value)
 
             if processor_family_values:
                 values_paragraph = doc.add_paragraph()
@@ -261,55 +252,39 @@ def processors_section(doc, file):
                     if idx < len(processor_family_values) - 1:
                         values_paragraph.add_run().add_break(WD_BREAK.LINE)
 
-        # Process footnotes if available
+        # Render footnotes after Processor Family.
         if footnotes_row_idx is not None:
             doc.add_paragraph()
-            footnotes_data = df.iloc[footnotes_row_idx + 1:]  
-            footnotes_data = footnotes_data.dropna(how='all')  
-            
+            footnotes_data = df.iloc[footnotes_row_idx + 1:].dropna(how='all')
+
             formatted_footnotes = []
             seen_footnotes = set()
-            
-            # Define the blue color
             footnote_color = RGBColor(0, 0, 153)
 
-            # Iterate over rows of footnotes_data and add them to the document
             for _, row in footnotes_data.iterrows():
-                # Get first two columns (column B typically has the footnote text)
                 if len(row) < 2:
                     continue
-                    
+
                 col_a = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
                 col_b = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else ""
-                
-                # Skip if both columns are empty
+
                 if not col_a and not col_b:
                     continue
-                
-                # Skip the "Footnote" header row
-                if col_a.lower() == 'footnote' or col_a.lower() == 'footnotes':
+                if col_a.lower() in ("footnote", "footnotes"):
                     continue
-                
-                # Check if col_a contains "footnote" with a number
-                if 'footnote' in col_a.lower() and col_b:
-                    # Extract number from "Footnote 2", "Footnote 3", etc.
+
+                if "footnote" in col_a.lower() and col_b:
                     footnote_number_str = ''.join(filter(str.isdigit, col_a))
                     if footnote_number_str:
-                        footnote_number = int(footnote_number_str)
-                        # Format as "2. Text from column B"
-                        formatted_text = f"{footnote_number}. {col_b}"
+                        formatted_text = f"{int(footnote_number_str)}. {col_b}"
                         if formatted_text not in seen_footnotes:
                             seen_footnotes.add(formatted_text)
                             formatted_footnotes.append(formatted_text)
-            
-            # Add all footnotes to a single paragraph with line breaks
+
             if formatted_footnotes:
                 footnote_paragraph = doc.add_paragraph()
                 for index, footnote_text in enumerate(formatted_footnotes):
-                    # Process the text for superscripts
                     add_formatted_run(footnote_paragraph, footnote_text, color=footnote_color)
-                    
-                    # Add line break between footnotes (but not after the last one)
                     if index < len(formatted_footnotes) - 1:
                         footnote_paragraph.add_run().add_break(WD_BREAK.LINE)
 
@@ -323,11 +298,5 @@ def processors_section(doc, file):
     except Exception as e:
         error_msg = f"An error occurred: {e}"
         print(error_msg)  # Log error to console
-
-        # Add error message to Word document in red bold text
-        error_paragraph = doc.add_paragraph()
-        error_run = error_paragraph.add_run(error_msg)
-        error_run.bold = True
-        error_run.font.color.rgb = RGBColor(255, 0, 0) 
 
         return str(e)

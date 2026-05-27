@@ -80,8 +80,10 @@ def insert_list(doc, df, start_value):
     footnotes = []
 
     for index, row in items_df.iterrows():
-        col_a_str = str(row[0]) if not pd.isna(row[0]) else ""
-        col_b_str = str(row[1]) if not pd.isna(row[1]) else ""
+        col_a_val = row.iloc[0] if len(row) > 0 else ""
+        col_b_val = row.iloc[1] if len(row) > 1 else ""
+        col_a_str = str(col_a_val) if not pd.isna(col_a_val) else ""
+        col_b_str = str(col_b_val) if not pd.isna(col_b_val) else ""
 
         if 'footnote' in col_a_str.lower():
             try:

@@ -10,3 +10,7 @@ db_granular/
 *.ttf
 backup
 scripts
+*.zip
+*.log
+*.docx
+*.xlsx

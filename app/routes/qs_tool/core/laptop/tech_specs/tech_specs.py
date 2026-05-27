@@ -23,6 +23,32 @@ from docx.shared import RGBColor
 
 import pandas as pd
 
+
+def _is_document_issue(error_message):
+    if not isinstance(error_message, str):
+        return False
+
+    message = error_message.lower()
+    document_issue_markers = [
+        "worksheet named",
+        "no sheet named",
+        "sheet",
+        "sheets",
+    ]
+    return any(marker in message for marker in document_issue_markers)
+
+
+def _render_section_error(doc, section_name, error_message):
+    if not isinstance(error_message, str) or not error_message.strip():
+        return
+
+    if not _is_document_issue(error_message):
+        return
+
+    para = doc.add_paragraph()
+    run = para.add_run(f"An error occurred in {section_name}: {error_message}")
+    run.font.color.rgb = RGBColor(255, 0, 0)
+
 def tech_specs_section(doc, file):
     """TechSpecs Section"""
 
@@ -45,7 +71,7 @@ def tech_specs_section(doc, file):
             raise ValueError(f"None of the specified sheets {sheet_names} were found. Available sheets: {available_sheets}")
 
         # Remove extra spaces from the end of each value and convert all columns to strings
-        df = df.applymap(lambda x: str(x).strip() if isinstance(x, str) else x)
+        df = df.apply(lambda col: col.map(lambda x: str(x).strip() if isinstance(x, str) else x))
 
         values_to_drop = ["General content", "General content 01", "General content 02"]
         
@@ -66,33 +92,40 @@ def tech_specs_section(doc, file):
         df = df.astype(str)
 
         # Run the functions to build the tech specs section
-        product_name_section(doc, file)
-        operating_systems_section(doc, df)
-        processors_section(doc, file)
-        graphics_section(doc, df)
-        display_section(doc, df)
-        docking_section(doc, df)
-        storage_section(doc, df)
-        memory_section(doc, df)
-        networking_section(doc, df)
-        audio_section(doc, df)
-        keyboard_section(doc, df)
-        digital_pen_section(doc, df)
-        software_section(doc, df)
-        power_section(doc, df)
-        dimensions_section(doc, df)
-        ports_section(doc, df)
-        service_section(doc, df)
-        #certification_section(doc, df)
+        sections = [
+            ("Product Name", lambda: product_name_section(doc, file)),
+            ("Operating Systems", lambda: operating_systems_section(doc, df)),
+            ("Processors", lambda: processors_section(doc, file)),
+            ("Graphics", lambda: graphics_section(doc, df)),
+            ("Display", lambda: display_section(doc, df)),
+            ("Docking", lambda: docking_section(doc, df)),
+            ("Storage", lambda: storage_section(doc, df)),
+            ("Memory", lambda: memory_section(doc, df)),
+            ("Networking", lambda: networking_section(doc, df)),
+            ("Audio", lambda: audio_section(doc, df)),
+            ("Keyboard", lambda: keyboard_section(doc, df)),
+            ("Digital Pen", lambda: digital_pen_section(doc, df)),
+            ("Software", lambda: software_section(doc, df)),
+            ("Power", lambda: power_section(doc, df)),
+            ("Dimensions", lambda: dimensions_section(doc, df)),
+            ("Ports", lambda: ports_section(doc, df)),
+            ("Service", lambda: service_section(doc, df)),
+            #( "Certification", lambda: certification_section(doc, df)),
+        ]
+
+        for section_name, section_func in sections:
+            section_error = section_func()
+            _render_section_error(doc, section_name, section_error)
         
         
     except Exception as e:
         error_message = f"An error occurred: {e}"
         print(error_message)
 
-        # Add error message to the document in red
-        para = doc.add_paragraph()
-        run = para.add_run(error_message)
-        run.font.color.rgb = RGBColor(255, 0, 0)  # Red color
+        if _is_document_issue(error_message):
+            # Add document-related error message to the document in red
+            para = doc.add_paragraph()
+            run = para.add_run(error_message)
+            run.font.color.rgb = RGBColor(255, 0, 0)
 
         return error_message
