@@ -24,7 +24,11 @@ def audio_section(doc, file):
 
         start_col_idx = 0
         end_col_idx = 1
+<<<<<<< HEAD
         start_row_idx = 4  # Changed from 5 to 4 to include Codec row
+=======
+        start_row_idx = 3
+>>>>>>> d4eaf05 (Saving local changes before syncing with remote)
         end_row_idx = 12
 
         data_range = df.iloc[start_row_idx:end_row_idx+1, start_col_idx:end_col_idx+1]
