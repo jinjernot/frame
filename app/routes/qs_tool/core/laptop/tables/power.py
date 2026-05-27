@@ -28,11 +28,7 @@ def power_section(doc, file):
 
     try:
         # Load xlsx
-<<<<<<< HEAD
         df = pd.read_excel(file.stream, sheet_name='QS-Only Power', engine='openpyxl')
-=======
-        df = pd.read_excel(file.stream, sheet_name='QS-Only Power', engine='openpyxl', header=None)
->>>>>>> d4eaf05 (Saving local changes before syncing with remote)
 
         # Add title: Power
         insert_title(doc, "POWER")
@@ -43,37 +39,6 @@ def power_section(doc, file):
         run.font.color.rgb = RGBColor(0, 0, 153) 
         paragraph.add_run().add_break(WD_BREAK.LINE)
 
-<<<<<<< HEAD
-=======
-        # Add subtitle from the marker row pattern:
-        # "Container Name | Value" followed by "Power | <subtitle>" (e.g. Battery).
-        subtitle_added = False
-        for i in range(1, len(df)):
-            prev_col0 = str(df.iloc[i - 1, 0]).strip().lower() if not pd.isna(df.iloc[i - 1, 0]) else ""
-            prev_col1 = str(df.iloc[i - 1, 1]).strip().lower() if not pd.isna(df.iloc[i - 1, 1]) else ""
-            curr_col0 = str(df.iloc[i, 0]).strip().lower() if not pd.isna(df.iloc[i, 0]) else ""
-            curr_col1 = str(df.iloc[i, 1]).strip() if not pd.isna(df.iloc[i, 1]) else ""
-
-            if (
-                prev_col0 == "container name"
-                and prev_col1 == "value"
-                and curr_col0 == "power"
-                and curr_col1
-            ):
-                insert_subtitle(doc, df, i, 1)
-                subtitle_added = True
-                break
-
-        # Fallback if the expected marker format differs but a Power row exists.
-        if not subtitle_added:
-            for i in range(len(df)):
-                curr_col0 = str(df.iloc[i, 0]).strip().lower() if not pd.isna(df.iloc[i, 0]) else ""
-                curr_col1 = str(df.iloc[i, 1]).strip() if not pd.isna(df.iloc[i, 1]) else ""
-                if curr_col0 == "power" and curr_col1 and curr_col1.lower() != "value":
-                    insert_subtitle(doc, df, i, 1)
-                    break
-
->>>>>>> d4eaf05 (Saving local changes before syncing with remote)
         # Add table
         table_count_before = len(doc.tables)
         insert_table(doc, df)
